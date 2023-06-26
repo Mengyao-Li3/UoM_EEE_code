@@ -5,12 +5,16 @@
 
 ################################################################################
 #
-# Optional libraries and functions. You can change or remove them.
+# Optional libraries, functions, and variables. You can change or remove them.
 #
 ################################################################################
 
 from helper_code import *
-import numpy as np, os
+import numpy as np, os, sys
+import mne
+#from sklearn.impute import SimpleImputer
+#from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+#import joblib
 
 #import pickle
 from scipy import signal
@@ -28,9 +32,9 @@ import shutil
 import random
 #from collections import Counter
 
-# import resource
-# soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-# resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -57,80 +61,32 @@ def train_challenge_model(data_folder, model_folder, verbose):
     if verbose >= 1:
         print('Extracting reshaped recordings and labels from the Challenge data...')
 
-    recordings = list()
+    EEG_recordings = list()
+    ECG_recordings = list()
     outcomes = list()
     cpcs = list()
-    patients = list() # created for cross validation
-    #patient_infos = list() # save patient metadata
 
     for i in range(num_patients):
         if verbose >= 2:
             print('    {}/{}...'.format(i+1, num_patients))
 
-        # Load data.
-        patient_id = patient_ids[i]
-        patient_metadata, recording_metadata, recording_data = load_challenge_data(data_folder, patient_id)
+        # Extract reshaped recordings
+        EEG_current_recording, ECG_curent_recording, EEG_sampling_frequency, ECG_sampling_frequency = get_recordings(data_folder, patient_ids[i])
+        EEG_recordings.append(EEG_current_recording)
+        ECG_recordings.append(ECG_curent_recording)
 
-        # Extract reshaped recordings.
-        b,a = signal.butter(4, [0.02,0.26], 'bandpass')
-        current_recordings = get_recordings(patient_metadata, recording_metadata, recording_data,b,a)
-        recordings.append(current_recordings)
-        #patient_infos.append(patient_info)
-
-        # Extract labels and patients' ids for each recording.
-        current_outcome = get_outcome(patient_metadata) # 0: good, 1: poor
+        # Extract labels.
+        patient_metadata = load_challenge_data(data_folder, patient_ids[i])
+        current_outcome = get_outcome(patient_metadata)
         outcomes.append(current_outcome)
-        current_cpc = get_cpc(patient_metadata) # 1,2,3,4,5
+        current_cpc = get_cpc(patient_metadata)
         cpcs.append(current_cpc)
-        patients.append(patient_id)
 
-    flag = 1 # 1: no segmenting; 0: with segmenting
-    if flag == 0:
-        #data segmenting and short-time Fourier transform
-        if verbose >= 1:
-            print('Segmenting data and employing short-time Fourier transform...')
+    #reshape data and labels
+    if verbose >= 1:
+       print('Employing short-time Fourier transform...')
 
-        X_all = list() # peprocessed recordings
-        y1_all = list() # preprocessed outcomes
-        y2_all = list() # preprocessed cpcs
-        z_all = list() # preprocessed patients' ids
-        frame_size = int(30000) # size of each segment
-        hop_size = int(30000) # non-overlapping
-        X_all, y1_all, y2_all, z_all = get_frames(recordings, frame_size, hop_size, outcomes, cpcs, patients, model_folder)
-
-    else:
-        #short-time Fourier transform
-        if verbose >= 1:
-            print('Employing short-time Fourier transform...')
-
-        frames = list()
-        for j in range(len(recordings)):
-
-            x_train = recordings[j]
-            STFT = list()
-            i = 0
-            img = list()
-
-            for m in range(18): # number of channels
-
-                if m == 2: # the 3rd channel
-                    img = STFT1(x_train[:,m],1, model_folder, j, i, outcomes[j], cpcs[j], patients[j])
-                    # dsize = output_width, output_height
-                    STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
-                    #filename = os.path.join(data_folder, 'resized image.png')
-                    #cv2.imwrite(filename, cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR))
-                else:
-                    img = STFT1(x_train[:,m],0, model_folder, j, i, outcomes[j], cpcs[j], patients[j])
-                    STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
-            
-            frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6], STFT[7], STFT[8], STFT[9], STFT[10], STFT[11], STFT[12], STFT[13], STFT[14], 
-                                        STFT[15], STFT[16], STFT[17])))
-        
-        # bring the segment into a better shape
-        X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],18)
-        y1_all = np.asarray(outcomes)
-        y2_all = np.asarray(cpcs)
-        z_all = np.asarray(patients)
+    X_all, y1_all, y2_all = data_reshape(model_folder, EEG_recordings, ECG_recordings, outcomes, cpcs, EEG_sampling_frequency, ECG_sampling_frequency)     
 
     # Generate outcome model and cpc model
     outcome_model = generate_cnn(2, X_all) # 2 labels: good, poor
@@ -175,48 +131,12 @@ def train_challenge_model(data_folder, model_folder, verbose):
         y2_train = tf.keras.utils.to_categorical(y2_train-1)   
 
         # train models   
-        outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, z_all, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+        outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
         res.append(outcome_val_score[1])
         outcome_model_history.append(outcome_results)
-        cpc_results, cpc_val_score = fit_and_eval(int(1),X_train, y2_train, z_all, cpc_model, epochs, batch_size, early_stopping, cpc_model_checkpoint)
+        cpc_results, cpc_val_score = fit_and_eval(int(1),X_train, y2_train, cpc_model, epochs, batch_size, early_stopping, cpc_model_checkpoint)
         res_cpc.append(cpc_val_score[1])
         cpc_model_history.append(cpc_results)
-
-        # outcome_train_label = list()
-        # outcome_val_label = list()
-        # outcome_train_patient = list()
-        # outcome_val_patient = list()
-        # for p in range(X_train.shape[0]):
-        #     if p in outcome_indices[0]:
-        #         outcome_train_label.append(y1_all[p])
-        #         outcome_train_patient.append(z_all[p])
-        #     else:
-        #         outcome_val_label.append(y1_all[p])
-        #         outcome_val_patient.append(z_all[p])
-
-        # cpc_train_label = list()
-        # cpc_val_label = list()
-        # cpc_train_patient = list()
-        # cpc_val_patient = list()
-        # for q in range(X_train.shape[0]):
-        #     if q in cpc_indices[0]:
-        #         cpc_train_label.append(y2_all[q])
-        #         cpc_train_patient.append(z_all[q])
-        #     else:
-        #         cpc_val_label.append(y2_all[q])
-        #         cpc_val_patient.append(z_all[q])
-    
-        # t2 = time.time()
-        # dt = t2 - t1
-        # print("Running time(s): ", dt)
-
-        # # save results
-        # results = {'Running_time_s': dt, 'Outcome_validation_accuracy': outcome_val_score, 'Cpc_validation accuracy': cpc_val_score}#, 
-        #         #    'outcome_train_label': outcome_train_label, 'outcome_train_patient': outcome_train_patient, 'outcome_val_label': outcome_val_label, 
-        #         #    'outcome_val_patient': outcome_val_patient, 'cpc_train_label': cpc_train_label, 'cpc_train_patient': cpc_train_patient, 'cpc_val_label': cpc_val_label, 
-        #         #    'cpc_val_patient': cpc_val_patient}
-        # file_name = os.path.join(model_folder, 'Trial ' + str(T), 'final_results_nested_holdout.pkl')
-        # pickle.dump(results,open(file_name,"wb"))
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
     plot_figures('outcome', num_trial, outcome_model_history, model_folder)
@@ -282,98 +202,32 @@ def run_challenge_models(models, data_folder, patient_id, verbose):
     outcome_model = models[0]
     cpc_model = models[1]
 
-    # Load data.
-    patient_metadata, recording_metadata, recording_data = load_challenge_data(data_folder, patient_id)
+    # Reshape recordings.
+    EEG_current_recording = list()
+    ECG_curent_recording = list()
 
-    # Extract reshaped recording.
-    current_recording = list()
-    b,a = signal.butter(4, [0.02,0.26], 'bandpass')
-    current_recording.append(get_recordings(patient_metadata, recording_metadata, recording_data,b,a))
+    current_recording_1, curent_recording_2, EEG_sampling_frequency, ECG_sampling_frequency = get_recordings(data_folder, patient_id)
+    EEG_current_recording.append(current_recording_1)
+    ECG_curent_recording.append(curent_recording_2)
 
-    if len(current_recording[0]) == 0:
-
+    if float('nan') in EEG_current_recording[0] and float('nan') in ECG_curent_recording[0]:
         print('No data was provided for patient ' + patient_id)
         return random.randint(0,1), 0.5, random.randint(1,5)
-
     else:
+        X_test = data_reshape(data_folder, EEG_current_recording, ECG_curent_recording, ['Nan'], ['Nan'], EEG_sampling_frequency, ECG_sampling_frequency)
 
-        flag = 1 # 1: no segmenting; 0: with segmenting
-        if flag == 0:
+        # Apply models to test data.
+        y1_pred = outcome_model.predict(X_test)
+        print(y1_pred)
+        outcome_probability = y1_pred[0][1]
+        print(outcome_probability)
+        y1_pred = np.argmax(y1_pred)
+        print(y1_pred)
 
-            # Extract labels and patient's id
-            current_outcome = list()
-            current_outcome.append('Nan') # 0: good, 1: poor
-            current_cpc = list()
-            current_cpc.append('Nan') # 1,2,3,4,5
-            current_patient = list()
-            current_patient.append(patient_id)
+        y2_pred = cpc_model.predict(X_test)
+        y2_pred = np.argmax(y2_pred)
 
-            frame_size = int(30000) # size of each segment
-            hop_size = int(30000) # non-overlapping
-            x_test, y1_test, y2_test, z_test = get_frames(current_recording, frame_size, hop_size, current_outcome, current_cpc, current_patient, data_folder)
-            X_test = np.asarray(x_test).reshape(-1, np.shape(x_test[0])[0],np.shape(x_test[0])[1],np.shape(x_test[0])[2])
-
-            # Apply models to test data.
-            y1_pred = outcome_model.predict(X_test)
-            outcome_probability = list()
-            for i in range(len(y1_pred)):
-                outcome_probability.append(y1_pred[i][1])
-            y1_pred = np.argmax(y1_pred, axis = 1)
-
-            y2_pred = cpc_model.predict(X_test)
-            y2_pred = np.argmax(y2_pred, axis = 1)
-
-            # get signal quality scores
-            quality_score = get_quality_scores(recording_metadata)
-            while np.nan in quality_score:
-                quality_score.remove(np.nan)
-
-            # calculate weights of decisions
-            w = list()
-            for i in range(len(quality_score)):
-                w.append(quality_score[i]/np.sum(quality_score))
-
-            return  np.sum(list(map(lambda e,f:e*f, w,y1_pred))), np.sum(list(map(lambda e,f:e*f, w,outcome_probability))), np.sum(list(map(lambda e,f:e*f, w,y2_pred+1)))#Counter(np.asarray(y1_pred)).most_common(1)[0][0], np.mean(outcome_probability), np.mean(y2_pred+1)
-        
-        else:
-
-            #short-time Fourier transform
-            x_test = current_recording[0]
-            STFT = list()
-            frames = list()
-            j = 0
-            i = 0
-            img = list()
-
-            for m in range(18): # number of channels
-                if m == 2: # the 3rd channel
-                    img = STFT1(x_test[:,m],1, data_folder, j, i, 'Nan', 'Nan', patient_id)
-                    # dsize = output_width, output_height
-                    STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
-                    #filename = os.path.join(data_folder, 'resized image.png')
-                    #cv2.imwrite(filename, cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR))
-                else:
-                    img = STFT1(x_test[:,m],0, data_folder, j, i, 'Nan', 'Nan', patient_id)
-                    STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
-            
-            frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6], STFT[7], STFT[8], STFT[9], STFT[10], STFT[11], STFT[12], STFT[13], STFT[14], 
-                                                STFT[15], STFT[16], STFT[17])))
-                
-            # bring the frames into a better shape
-            X_test = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],18)
-
-            # # Apply models to test data.
-            y1_pred = outcome_model.predict(X_test)
-            print(y1_pred)
-            outcome_probability = y1_pred[0][1]
-            print(outcome_probability)
-            y1_pred = np.argmax(y1_pred)
-            print(y1_pred)
-
-            y2_pred = cpc_model.predict(X_test)
-            y2_pred = np.argmax(y2_pred)
-
-            return  y1_pred, outcome_probability, y2_pred+1 #Counter(np.asarray(y1_pred)).most_common(1)[0][0], np.mean(outcome_probability), np.mean(y2_pred+1)
+        return  y1_pred, outcome_probability, y2_pred+1 #Counter(np.asarray(y1_pred)).most_common(1)[0][0], np.mean(outcome_probability), np.mean(y2_pred+1)
 
 ################################################################################
 #
@@ -381,10 +235,124 @@ def run_challenge_models(models, data_folder, patient_id, verbose):
 #
 ################################################################################
 
-########## data transformation: short-time Fourier transform
-def STFT1(X,flag, figure_folder, j, i, y1, y2, z):
+# Save your trained model.
+# def save_challenge_model(model_folder, imputer, outcome_model, cpc_model):
+#     d = {'imputer': imputer, 'outcome_model': outcome_model, 'cpc_model': cpc_model}
+#     filename = os.path.join(model_folder, 'models.sav')
+#     joblib.dump(d, filename, protocol=0)
+
+# Preprocess data.
+def preprocess_data(data, sampling_frequency, utility_frequency):
+    # Define the bandpass frequencies.
+    passband = [0.1, 30.0]
+
+    # Promote the data to double precision because these libraries expect double precision.
+    data = np.asarray(data, dtype=np.float64)
+
+    # If the utility frequency is between bandpass frequencies, then apply a notch filter.
+    if utility_frequency is not None and passband[0] <= utility_frequency <= passband[1]:
+        data = mne.filter.notch_filter(data, sampling_frequency, utility_frequency, n_jobs=4, verbose='error')
+
+    # Apply a bandpass filter.
+    data = mne.filter.filter_data(data, sampling_frequency, passband[0], passband[1], n_jobs=4, verbose='error')
+
+    # Resample the data.
+    if sampling_frequency % 2 == 0:
+        resampling_frequency = 128
+    else:
+        resampling_frequency = 125
+    lcm = np.lcm(int(round(sampling_frequency)), int(round(resampling_frequency)))
+    up = int(round(lcm / sampling_frequency))
+    down = int(round(lcm / resampling_frequency))
+    resampling_frequency = sampling_frequency * up / down
+    data = scipy.signal.resample_poly(data, up, down, axis=1)
+
+    # Scale the data to the interval [-1, 1].
+    min_value = np.min(data)
+    max_value = np.max(data)
+    if min_value != max_value:
+        data = 2.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value))
+    else:
+        data = 0 * data
+
+    return data, resampling_frequency
+
+# Extract reshaped recordings.
+def get_recordings(data_folder, patient_id):
+    # Load patient data.
+    #patient_metadata = load_challenge_data(data_folder, patient_id)
+    recording_ids = find_recording_files(data_folder, patient_id)
+    num_recordings = len(recording_ids)
+
+    # Extract patient features.
+    #patient_features = get_patient_features(patient_metadata)
+
+    # Extract EEG recordings.
+    EEG_data = list()
+    EEG_sampling_frequency = 500
+    eeg_channels = ['F3', 'P3', 'F4', 'P4']
+    group = 'EEG'
+
+    if num_recordings > 0:
+        recording_id = recording_ids[-1]
+        recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+        if os.path.exists(recording_location + '.hea'):
+            data, channels, sampling_frequency = load_recording_data(recording_location)
+            utility_frequency = get_utility_frequency(recording_location + '.hea')
+
+            if all(channel in channels for channel in eeg_channels):
+                data, channels = reduce_channels(data, channels, eeg_channels)
+                data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+                EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
+                # data size: num_channels * num_samples 
+                #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
+            else:
+                #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+                #num_channels, num_samples = np.shape(data)
+                EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+        else:
+            #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+            EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+    else:
+        #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+        EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+
+    # Extract ECG recordings.
+    ECG_data = list()
+    ECG_sampling_frequency = 500
+    ecg_channels = ['ECG', 'ECGL', 'ECGR', 'ECG1', 'ECG2']
+    group = 'ECG'
+
+    if num_recordings > 0:
+        recording_id = recording_ids[0]
+        recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+        if os.path.exists(recording_location + '.hea'):
+            data, channels, sampling_frequency = load_recording_data(recording_location)
+            utility_frequency = get_utility_frequency(recording_location + '.hea')
+
+            if all(channel in channels for channel in eeg_channels):
+                data, channels = reduce_channels(data, channels, ecg_channels)
+                ECG_data, ECG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+                #features = get_ecg_features(data)
+                #ecg_features = expand_channels(features, channels, ecg_channels).flatten()
+            else:
+                ECG_data = float('nan') * np.ones((5, 30000))
+        else:
+            #ecg_features = float('nan') * np.ones(10) # 5 channels * 2 features / channel
+            #num_channels, num_samples = np.shape(data)
+            ECG_data = float('nan') * np.ones((5, 30000)) # 5 channels * 500 Hz * 60 s
+    else:
+        #ecg_features = float('nan') * np.ones(10) # 5 channels * 2 features / channel
+        ECG_data = float('nan') * np.ones((5, 30000)) # 5 channels * 500 Hz * 60 s
+
+    # Extract features.
+    #return np.hstack((patient_features, eeg_features, ecg_features))
+    return EEG_data.T, ECG_data.T, EEG_sampling_frequency, ECG_sampling_frequency
+
+# short-time Fourier transform
+def STFT1(X,flag,figure_folder,j,i,y1,y2,sampling_frequency,A):
         
-    f,t,Zxx = signal.stft(X,100) # sampling rate = 100 Hz
+    f,t,Zxx = signal.stft(X,sampling_frequency)
     Zxx = np.abs(Zxx)
     
     # if flag ==1:
@@ -396,83 +364,45 @@ def STFT1(X,flag, figure_folder, j, i, y1, y2, z):
     #     plt.ylabel('Frequency [Hz]')
     #     plt.xlabel('Time [sec]')
     #     os.makedirs(os.path.join(figure_folder, 'STFT figures'), exist_ok=True)
-    #     c3_filename = os.path.join(figure_folder, 'STFT figures', str(y1) + '_' + str(y2) + '_' + str(z) + '_' + str(j) + '_' + str(i) + '_' + 'c3_stft.png')
-    #     plt.savefig(c3_filename)
+    #     filename = os.path.join(figure_folder, 'STFT figures', A+'_'+str(y1)+'_'+str(y2)+'_'+str(j)+'_'+str(i)+'.png')
+    #     plt.savefig(filename)
     #     plt.close()
     # else:
     #     pass
     
     return Zxx
 
-########## data segment
-def get_frames(x, frame_size, hop_size, y1, y2, z, figure_folder):
-    
+#reshape data and labels
+def data_reshape(model_folder,EEG_recordings, ECG_recordings, outcomes, cpcs, EEG_sampling_frequency, ECG_sampling_frequency):
+
     frames = list()
-    outcomes = list()
-    cpcs = list()
-    patients = list()
 
-    for j in range(len(x)):
+    for j in range(len(EEG_recordings)):
+        STFT = list()
 
-        x_train = x[j]
-    
-        for i in range(0, np.shape(x_train)[0] - frame_size + 1, hop_size): 
-        
-            c1 = x_train[i:i+frame_size,0]
-            c2 = x_train[i:i+frame_size,1]
-            c3 = x_train[i:i+frame_size,2]
-            c4 = x_train[i:i+frame_size,3]
-            c5 = x_train[i:i+frame_size,4]
-            c6 = x_train[i:i+frame_size,5]
-            c7 = x_train[i:i+frame_size,6]
-            c8 = x_train[i:i+frame_size,7]
-            c9 = x_train[i:i+frame_size,8]
-            c10 = x_train[i:i+frame_size,9]
-            c11 = x_train[i:i+frame_size,10]
-            c12 = x_train[i:i+frame_size,11]
-            c13 = x_train[i:i+frame_size,12]
-            c14 = x_train[i:i+frame_size,13]
-            c15 = x_train[i:i+frame_size,14]
-            c16 = x_train[i:i+frame_size,15]
-            c17 = x_train[i:i+frame_size,16]
-            c18 = x_train[i:i+frame_size,17]
-        
-            y = list()
-            for k in range(frame_size): # frame_size
-                y.append(k/100)
-            # plt.clf()
-            # plt.title('Time Series Diagram')
-            # plt.plot(y,c3)
-            # plt.xticks([0,60,120,180,240,300]) # should be changed according to frame_size
-            # plt.ylabel('Voltage [uV]')
-            # plt.xlabel('Time [sec]')
-            # os.makedirs(os.path.join(figure_folder, 'STFT figures'), exist_ok=True)
-            # c3_filename = os.path.join(figure_folder, 'STFT figures', str(y1[j]) + '_' + str(y2[j]) + '_' + str(z[j]) + '_' + str(j) + '_' + str(i) + '_' + 'c3.png')
-            # plt.savefig(c3_filename)
-            # plt.close()
+        EEG_x_train = EEG_recordings[j]
+        img = list()
+        for m in range(2):
+            img = STFT1(EEG_x_train[:,m],1,model_folder,j,m,outcomes[j],cpcs[j],EEG_sampling_frequency,'EEG')
+            # dsize = output_width, output_height
+            STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
 
-            STFT = list()
-            L = [c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18]
-            for m in range(len(L)):
-                if L[m] is c3:
-                    STFT.append(STFT1(L[m],1, figure_folder, j, i, y1[j], y2[j], z[j]))
-                else:
-                    STFT.append(STFT1(L[m],0, figure_folder, j, i, y1[j], y2[j], z[j]))
+        ECG_x_train = ECG_recordings[j]
+        img = list()
+        for m in range(5):
+            img = STFT1(ECG_x_train[:,m],1,model_folder,j,m,outcomes[j],cpcs[j],ECG_sampling_frequency,'ECG')
+            # dsize = output_width, output_height
+            STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4    
 
-            frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6], STFT[7], STFT[8], STFT[9], STFT[10], STFT[11], STFT[12], STFT[13], STFT[14], 
-                                     STFT[15], STFT[16], STFT[17])))
-            
-            outcomes.append(y1[j])
-            cpcs.append(y2[j])
-            patients.append(z[j])
-    
+        frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6])))
     # bring the segment into a better shape
-    frames = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1], 18)
-    outcomes = np.asarray(outcomes)
-    cpcs = np.asarray(cpcs)
-    patients = np.asarray(patients)
-    
-    return frames, outcomes, cpcs, patients
+    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],7)
+    if outcomes[0] == 'Nan':
+        return X_all
+    else:
+        y1_all = np.asarray(outcomes)
+        y2_all = np.asarray(cpcs)
+        return X_all, y1_all, y2_all
 
 # custom loss function
 def custom_loss(y, y_hat):
@@ -555,9 +485,10 @@ def generate_cnn(k, X_all):
     
     return model
 
-def fit_and_eval(flag,X,y,z,model,epochs,batch_size,early_stopping,model_checkpoint):
+def fit_and_eval(flag,X,y,model,epochs,batch_size,early_stopping,model_checkpoint):
     
-    X_train, X_val, y_train, y_val = train_test_split(X,y,test_size=0.2, stratify=y) # randomly select 80% for training, the rest 20% for validation 
+    #, stratify=y
+    X_train, X_val, y_train, y_val = train_test_split(X,y,test_size=0.2) # randomly select 80% for training, the rest 20% for validation 
     # indices = np.arange(X.shape[0])
     # X_train, X_val, y_train, y_val, indices_train, indices_val = train_test_split(X,y,indices,test_size=0.2, stratify=y)
 
@@ -610,96 +541,68 @@ def plot_figures(A, n_folds,model_history, model_folder):
         plt.savefig(fig_name, dpi=200, bbox_inches='tight')
         plt.close()
 
-#def get_features(patient_metadata, recording_metadata, recording_data):
-# Extract reshaped recordings from the data.
-def get_recordings(patient_metadata, recording_metadata, recording_data,b,a): 
-    # Extract features from the patient metadata.
-    age = get_age(patient_metadata)
-    sex = get_sex(patient_metadata)
-    rosc = get_rosc(patient_metadata)
-    ohca = get_ohca(patient_metadata)
-    vfib = get_vfib(patient_metadata)
-    ttm = get_ttm(patient_metadata)
+# Extract patient features from the data.
+# def get_patient_features(data):
+#     age = get_age(data)
+#     sex = get_sex(data)
+#     rosc = get_rosc(data)
+#     ohca = get_ohca(data)
+#     shockable_rhythm = get_shockable_rhythm(data)
+#     ttm = get_ttm(data)
 
-    # Use one-hot encoding for sex; add more variables
-    sex_features = np.zeros(2, dtype=int)
-    if sex == 'Female':
-        female = 1
-        male   = 0
-        other  = 0
-    elif sex == 'Male':
-        female = 0
-        male   = 1
-        other  = 0
-    else:
-        female = 0
-        male   = 0
-        other  = 1
+#     sex_features = np.zeros(2, dtype=int)
+#     if sex == 'Female':
+#         female = 1
+#         male   = 0
+#         other  = 0
+#     elif sex == 'Male':
+#         female = 0
+#         male   = 1
+#         other  = 0
+#     else:
+#         female = 0
+#         male   = 0
+#         other  = 1
 
-    # Combine the patient features.
-    patient_features = np.array([age, female, male, other, rosc, ohca, vfib, ttm])
+#     features = np.array((age, female, male, other, rosc, ohca, shockable_rhythm, ttm))
 
-    # Extract features from the recording data and metadata.
-    channels = ['Fp1-F7', 'F7-T3', 'T3-T5', 'T5-O1', 'Fp2-F8', 'F8-T4', 'T4-T6', 'T6-O2', 'Fp1-F3',
-                'F3-C3', 'C3-P3', 'P3-O1', 'Fp2-F4', 'F4-C4', 'C4-P4', 'P4-O2', 'Fz-Cz', 'Cz-Pz']
-    #num_channels = len(channels)
-    num_recordings = len(recording_data)
+#     return features
 
-    # Compute mean and standard deviation for each channel for each recording.
-    available_signal_data = list()
-    for i in range(num_recordings):
-        signal_data, sampling_frequency, signal_channels = recording_data[i]
-        if signal_data is not None:
-            signal_data = reorder_recording_channels(signal_data, signal_channels, channels) # Reorder the channels in the signal data, as needed, for consistency across different recordings.
-            # reserve three common frequency bands (delta, 1–4 Hz; theta, 4–8 Hz and alpha, 8–13 Hz)
-            filted_data = signal_data
-            for i in range(np.shape(signal_data)[0]):
-                filted_data[i,:] = signal.filtfilt(b,a,signal_data[i,:])
-            available_signal_data.append(filted_data.T) # size: num_samples * num_channels
-    if len(available_signal_data) > 0:
-        available_signal_data = np.vstack(available_signal_data) 
-    else:
-        pass
+# # Extract features from the EEG data.
+# def get_eeg_features(data, sampling_frequency):
+#     num_channels, num_samples = np.shape(data)
 
-    # if len(available_signal_data) > 0:
-    #     available_signal_data = np.hstack(available_signal_data)
-    #     signal_mean = np.nanmean(available_signal_data, axis=1)
-    #     signal_std  = np.nanstd(available_signal_data, axis=1)
-    # else:
-    #     signal_mean = float('nan') * np.ones(num_channels)
-    #     signal_std  = float('nan') * np.ones(num_channels)
+#     if num_samples > 0:
+#         delta_psd, _ = mne.time_frequency.psd_array_welch(data, sfreq=sampling_frequency,  fmin=0.5,  fmax=8.0, verbose=False)
+#         theta_psd, _ = mne.time_frequency.psd_array_welch(data, sfreq=sampling_frequency,  fmin=4.0,  fmax=8.0, verbose=False)
+#         alpha_psd, _ = mne.time_frequency.psd_array_welch(data, sfreq=sampling_frequency,  fmin=8.0, fmax=12.0, verbose=False)
+#         beta_psd,  _ = mne.time_frequency.psd_array_welch(data, sfreq=sampling_frequency, fmin=12.0, fmax=30.0, verbose=False)
 
-    # # Compute the power spectral density for the delta, theta, alpha, and beta frequency bands for each channel of the most
-    # # recent recording.
-    # index = None
-    # for i in reversed(range(num_recordings)):
-    #     signal_data, sampling_frequency, signal_channels = recording_data[i]
-    #     if signal_data is not None:
-    #         index = i
-    #         break
+#         delta_psd_mean = np.nanmean(delta_psd, axis=1)
+#         theta_psd_mean = np.nanmean(theta_psd, axis=1)
+#         alpha_psd_mean = np.nanmean(alpha_psd, axis=1)
+#         beta_psd_mean  = np.nanmean(beta_psd,  axis=1)
+#     else:
+#         delta_psd_mean = theta_psd_mean = alpha_psd_mean = beta_psd_mean = float('nan') * np.ones(num_channels)
 
-    # if index is not None:
-    #     signal_data, sampling_frequency, signal_channels = recording_data[index]
-    #     signal_data = reorder_recording_channels(signal_data, signal_channels, channels) # Reorder the channels in the signal data, as needed, for consistency across different recordings.
+#     features = np.array((delta_psd_mean, theta_psd_mean, alpha_psd_mean, beta_psd_mean)).T
 
-    #     delta_psd, _ = mne.time_frequency.psd_array_welch(signal_data, sfreq=sampling_frequency,  fmin=0.5,  fmax=8.0, verbose=False)
-    #     theta_psd, _ = mne.time_frequency.psd_array_welch(signal_data, sfreq=sampling_frequency,  fmin=4.0,  fmax=8.0, verbose=False)
-    #     alpha_psd, _ = mne.time_frequency.psd_array_welch(signal_data, sfreq=sampling_frequency,  fmin=8.0, fmax=12.0, verbose=False)
-    #     beta_psd,  _ = mne.time_frequency.psd_array_welch(signal_data, sfreq=sampling_frequency, fmin=12.0, fmax=30.0, verbose=False)
+#     return features
 
-    #     delta_psd_mean = np.nanmean(delta_psd, axis=1)
-    #     theta_psd_mean = np.nanmean(theta_psd, axis=1)
-    #     alpha_psd_mean = np.nanmean(alpha_psd, axis=1)
-    #     beta_psd_mean  = np.nanmean(beta_psd,  axis=1)
+# # Extract features from the ECG data.
+# def get_ecg_features(data):
+#     num_channels, num_samples = np.shape(data)
 
-    #     quality_score = get_quality_scores(recording_metadata)[index]
-    # else:
-    #     delta_psd_mean = theta_psd_mean = alpha_psd_mean = beta_psd_mean = float('nan') * np.ones(num_channels)
-    #     quality_score = float('nan')
+#     if num_samples > 0:
+#         mean = np.mean(data, axis=1)
+#         std  = np.std(data, axis=1)
+#     elif num_samples == 1:
+#         mean = np.mean(data, axis=1)
+#         std  = float('nan') * np.ones(num_channels)
+#     else:
+#         mean = float('nan') * np.ones(num_channels)
+#         std = float('nan') * np.ones(num_channels)
 
-    # recording_features = np.hstack((signal_mean, signal_std, delta_psd_mean, theta_psd_mean, alpha_psd_mean, beta_psd_mean, quality_score))
+#     features = np.array((mean, std)).T
 
-    # # Combine the features from the patient metadata and the recording data and metadata.
-    # features = np.hstack((patient_features, recording_features))
-
-    return available_signal_data#, features
+#     return features
