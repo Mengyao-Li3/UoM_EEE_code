@@ -32,9 +32,9 @@ import shutil
 import random
 #from collections import Counter
 
-import resource
-soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+#import resource
+#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
