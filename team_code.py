@@ -19,10 +19,11 @@ import mne
 #import pickle
 from scipy import signal
 import tensorflow as tf
+import torch
 #import tensorflow_ranking as tfr
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Flatten, Dense, Dropout
-from tensorflow.keras.layers import Conv2D, MaxPool2D, BatchNormalization
+from tensorflow.keras.layers import Conv2D, MaxPool2D, BatchNormalization, Activation
 from sklearn.model_selection import train_test_split
 from matplotlib import pyplot as plt
 from keras.callbacks import ModelCheckpoint, EarlyStopping
@@ -32,9 +33,9 @@ import shutil
 import random
 #from collections import Counter
 
-#import resource
-#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -117,7 +118,7 @@ def train_challenge_model(data_folder, model_folder, verbose):
         # dt = list()
         # t1 = time.time()
         epochs = 150#300#200#120
-        batch_size = 64#32#64
+        batch_size = 32#64#32#64
 
         X_train = X_all
         y1_train = y1_all
@@ -433,50 +434,81 @@ def custom_fpr(y, y_hat):
 
     return macro_cost
 
+# custom metric function
+def custom_auc(y, y_hat):
+
+    y = tf.cast(y, tf.float32)
+    y_hat = tf.cast(y_hat, tf.float32)
+    y_hat_new = y_hat
+
+    fps = list()
+    tns = list()
+    for i in y_hat: # threshold
+
+        y_hat_new = torch.where(y_hat-i>0, y_hat-i, 0)
+        fps.append(tf.reduce_sum(y_hat_new * (1 - y), axis=0))
+        tns.append(tf.reduce_sum((i - y_hat) * (1 - y), axis=0))
+
+    fp = tf.reduce_sum(y_hat * (1 - y), axis=0)
+    tn = tf.reduce_sum((1 - y_hat) * (1 - y), axis=0)
+
+    fpr = fp/(fp+tn+1e-16)
+    macro_cost = tf.reduce_mean(fpr)
+
+    return macro_cost
+
 ########## Generate CNN Model
 def generate_cnn(k, X_all):
     
     model = Sequential()
-    model.add(Conv2D(8, (3,3), padding = 'same', activation='relu', kernel_initializer='lecun_uniform', input_shape=(np.shape(X_all)[1],np.shape(X_all)[2],np.shape(X_all)[3])))
+    model.add(Conv2D(16, (3,3), padding = 'same', activation='linear', kernel_initializer='lecun_uniform', input_shape=(np.shape(X_all)[1],np.shape(X_all)[2],np.shape(X_all)[3])))
     model.add(BatchNormalization(axis=-1))
+    model.add(Activation('relu'))
     model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
 
-    model.add(Conv2D(16, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='relu'))
+    model.add(Conv2D(32, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='linear'))
     model.add(BatchNormalization(axis=-1))
+    model.add(Activation('relu'))
     model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
 
-    model.add(Conv2D(32, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='relu'))
+    model.add(Conv2D(64, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='linear'))
     model.add(BatchNormalization(axis=-1))
+    model.add(Activation('relu'))
     model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
     #model.add(Dropout(0.1))
 
-    model.add(Conv2D(64, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='relu'))
+    model.add(Conv2D(128, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='linear'))
     model.add(BatchNormalization(axis=-1))
+    model.add(Activation('relu'))
     model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
     #model.add(Dropout(0.25))
 
-    model.add(Conv2D(64, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='relu'))
+    model.add(Conv2D(256, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='linear'))
     model.add(BatchNormalization(axis=-1))
+    model.add(Activation('relu'))
     model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
 
-    # model.add(Conv2D(256, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='relu'))
-    # model.add(BatchNormalization(axis=-1))
-    # model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
+    model.add(Conv2D(512, (3,3), padding = 'same', kernel_initializer='lecun_uniform', activation='linear'))
+    model.add(BatchNormalization(axis=-1))
+    model.add(Activation('relu'))
+    model.add(MaxPool2D(pool_size=(2,2), padding = 'same'))
 
     model.add(Flatten())
 
-    model.add(Dense(64, activation='relu', kernel_initializer='lecun_uniform'))
+    model.add(Dense(1024, activation='linear', kernel_initializer='lecun_uniform'))
+    model.add(Activation('relu'))
     model.add(Dropout(0.75))
 
-    # model.add(Dense(512, activation='relu', kernel_initializer='lecun_uniform'))
+    model.add(Dense(1024, activation='linear', kernel_initializer='lecun_uniform'))
+    model.add(Activation('relu'))
 
     model.add(Dense(k, activation='softmax', kernel_initializer='lecun_uniform'))
     model.summary()
 
     #Model compiler settings
     if k ==2:
-        model.compile(optimizer = tf.keras.optimizers.legacy.SGD(learning_rate=0.001),#tf.keras.optimizers.Adam(0.0005),
-              loss=custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
+        model.compile(optimizer = tf.keras.optimizers.Adam(0.001),#tf.keras.optimizers.legacy.SGD(learning_rate=0.01),#tf.keras.optimizers.Adam(0.0005),
+              loss='binary_focal_crossentropy',#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(),#custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
               metrics=[custom_fpr,tf.keras.metrics.Recall()]) #['accuracy'])
     else:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.01),
@@ -487,8 +519,7 @@ def generate_cnn(k, X_all):
 
 def fit_and_eval(flag,X,y,model,epochs,batch_size,early_stopping,model_checkpoint):
     
-    #, stratify=y
-    X_train, X_val, y_train, y_val = train_test_split(X,y,test_size=0.2) # randomly select 80% for training, the rest 20% for validation 
+    X_train, X_val, y_train, y_val = train_test_split(X,y,test_size=0.2, stratify=y) # randomly select 80% for training, the rest 20% for validation 
     # indices = np.arange(X.shape[0])
     # X_train, X_val, y_train, y_val, indices_train, indices_val = train_test_split(X,y,indices,test_size=0.2, stratify=y)
 
