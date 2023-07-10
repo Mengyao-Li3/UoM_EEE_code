@@ -10,7 +10,7 @@
 ################################################################################
 
 from helper_code import *
-import numpy as np, os, sys
+import numpy as np, os#, sys
 import mne
 #from sklearn.impute import SimpleImputer
 #from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
@@ -19,7 +19,6 @@ import mne
 #import pickle
 from scipy import signal
 import tensorflow as tf
-import torch
 #import tensorflow_ranking as tfr
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Flatten, Dense, Dropout
@@ -94,7 +93,7 @@ def train_challenge_model(data_folder, model_folder, verbose):
     cpc_model = generate_cnn(5, X_all) # 5 labels: 1, 2, 3, 4, 5
 
     # set early stopping criteria
-    pat = 5#10 # the number of epochs with no improvement after which the training will stop
+    pat = 10#5#10 # the number of epochs with no improvement after which the training will stop
     early_stopping =  EarlyStopping(monitor='val_loss',patience=pat, verbose=1, restore_best_weights=True)
 
     res = list()
@@ -106,9 +105,13 @@ def train_challenge_model(data_folder, model_folder, verbose):
 
         # save the models as physical files
         os.makedirs(os.path.join(model_folder, 'Trial ' + str(T)), exist_ok=True) # Create a folder for the Challenge outputs if it does not already exist.
-        outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), '{epoch:03d}_{val_recall:.4f}_' + 'outcome_model.h5')
+
+        # outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), '{epoch:03d}_{val_recall:.4f}_' + 'outcome_model.h5')
+        # oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=False)
+        outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), 'outcome_model.h5')
+        oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=True)
+
         cpc_filename = os.path.join(model_folder, 'Trial ' + str(T), 'cpc_model.h5')
-        oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=False)
         cpc_model_checkpoint = ModelCheckpoint(filepath = cpc_filename, verbose=1, save_best_only=True)
 
         # model training
@@ -132,7 +135,10 @@ def train_challenge_model(data_folder, model_folder, verbose):
         y2_train = tf.keras.utils.to_categorical(y2_train-1)   
 
         # train models   
-        outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+
+        # outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+        outcome_results, outcome_val_score= fit_and_eval(int(1),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+
         res.append(outcome_val_score[1])
         outcome_model_history.append(outcome_results)
         cpc_results, cpc_val_score = fit_and_eval(int(1),X_train, y2_train, cpc_model, epochs, batch_size, early_stopping, cpc_model_checkpoint)
@@ -147,35 +153,38 @@ def train_challenge_model(data_folder, model_folder, verbose):
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
     outcome_name = os.path.join(model_folder, 'Optimal', 'outcome_model.h5')
     cpc_name = os.path.join(model_folder, 'Optimal', 'cpc_model.h5')
-    fold_best_model = list()
-    fold_best_metric = list()
-    for i in range(num_trial):
-        temp = list()
-        temp = 1 - np.asarray(outcome_model_history[i].history['val_custom_fpr'])#1 - np.asarray(outcome_model_history[i].history['val_loss'])#outcome_model_history[i].history['val_recall']
-        temp2 = list()
-        temp2 = 1-np.asarray(outcome_model_history[i].history['val_recall'])#1 - np.asarray(outcome_model_history[i].history['val_macro_double_soft_tpr'])#outcome_model_history[i].history['val_loss']
-        temp_ind = list()
-        temp3 = list()
-        for j in range(len(temp)):
-            if temp[j] == np.max(temp) or temp[j] >= 0.95:
-                temp_ind.append(j)
-                temp3.append(temp2[j])
-            else:
-                pass
-        final_ind = temp_ind[np.argmin(temp3)]
-        fold_best_metric.append([temp[final_ind],temp2[final_ind]])
-        print("epoch, val_fpr, val_recall:", final_ind + 1, 1-temp[final_ind], 1-temp2[final_ind])
-        fold_best_model.append(os.path.join(model_folder, 'Trial ' + str(i), str(format(final_ind + 1, '03d'))+'_'+str(format(1-temp2[final_ind],'.4f'))+'_'+'outcome_model.h5'))
-        #fold_best_model.append(os.path.join(model_folder, '10-fold CV', 'Fold_'+str(i+1)+'_'+str(format(final_ind + 1, '03d'))+'_'+str(format(outcome_model_history[i].history['val_recall'][final_ind],'.4f'))+'_outcome_KFold.h5'))
-    Ind = list()
-    Temp = list()
-    for k in range(len(fold_best_model)):
-        if fold_best_metric[k][0] == np.max(fold_best_metric,axis=0)[0] or fold_best_metric[k][0] >= 0.95:
-            Ind.append(k)
-            Temp.append(fold_best_metric[k][1])
-        else:
-            pass
-    shutil.copyfile(fold_best_model[Ind[np.argmin(Temp)]], outcome_name)
+
+    # fold_best_model = list()
+    # fold_best_metric = list()
+    # for i in range(num_trial):
+    #     temp = list()
+    #     temp = 1 - np.asarray(outcome_model_history[i].history['val_custom_fpr'])#1 - np.asarray(outcome_model_history[i].history['val_loss'])#outcome_model_history[i].history['val_recall']
+    #     temp2 = list()
+    #     temp2 = 1-np.asarray(outcome_model_history[i].history['val_recall'])#1 - np.asarray(outcome_model_history[i].history['val_macro_double_soft_tpr'])#outcome_model_history[i].history['val_loss']
+    #     temp_ind = list()
+    #     temp3 = list()
+    #     for j in range(len(temp)):
+    #         if temp[j] == np.max(temp) or temp[j] >= 0.95:
+    #             temp_ind.append(j)
+    #             temp3.append(temp2[j])
+    #         else:
+    #             pass
+    #     final_ind = temp_ind[np.argmin(temp3)]
+    #     fold_best_metric.append([temp[final_ind],temp2[final_ind]])
+    #     print("epoch, val_fpr, val_recall:", final_ind + 1, 1-temp[final_ind], 1-temp2[final_ind])
+    #     fold_best_model.append(os.path.join(model_folder, 'Trial ' + str(i), str(format(final_ind + 1, '03d'))+'_'+str(format(1-temp2[final_ind],'.4f'))+'_'+'outcome_model.h5'))
+    #     #fold_best_model.append(os.path.join(model_folder, '10-fold CV', 'Fold_'+str(i+1)+'_'+str(format(final_ind + 1, '03d'))+'_'+str(format(outcome_model_history[i].history['val_recall'][final_ind],'.4f'))+'_outcome_KFold.h5'))
+    # Ind = list()
+    # Temp = list()
+    # for k in range(len(fold_best_model)):
+    #     if fold_best_metric[k][0] == np.max(fold_best_metric,axis=0)[0] or fold_best_metric[k][0] >= 0.95:
+    #         Ind.append(k)
+    #         Temp.append(fold_best_metric[k][1])
+    #     else:
+    #         pass
+    # shutil.copyfile(fold_best_model[Ind[np.argmin(Temp)]], outcome_name)
+    shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res)), 'outcome_model.h5'), outcome_name)
+
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
     print('Save the optimal model finished.')
 
@@ -211,7 +220,12 @@ def run_challenge_models(models, data_folder, patient_id, verbose):
     EEG_current_recording.append(current_recording_1)
     ECG_curent_recording.append(curent_recording_2)
 
-    if float('nan') in EEG_current_recording[0] and float('nan') in ECG_curent_recording[0]:
+    # if float('nan') in EEG_current_recording[0] and float('nan') in ECG_curent_recording[0]:
+    #     print('No data was provided for patient ' + patient_id)
+    #     return random.randint(0,1), 0.5, random.randint(1,5)
+    # else:
+    #     X_test = data_reshape(data_folder, EEG_current_recording, ECG_curent_recording, ['Nan'], ['Nan'], EEG_sampling_frequency, ECG_sampling_frequency)
+    if np.isnan(EEG_current_recording[0]).all() and np.isnan(ECG_curent_recording[0]).all():
         print('No data was provided for patient ' + patient_id)
         return random.randint(0,1), 0.5, random.randint(1,5)
     else:
@@ -320,6 +334,7 @@ def get_recordings(data_folder, patient_id):
 
     # Extract ECG recordings.
     ECG_data = list()
+    DATA = list()
     ECG_sampling_frequency = 500
     ecg_channels = ['ECG', 'ECGL', 'ECGR', 'ECG1', 'ECG2']
     group = 'ECG'
@@ -331,13 +346,12 @@ def get_recordings(data_folder, patient_id):
             data, channels, sampling_frequency = load_recording_data(recording_location)
             utility_frequency = get_utility_frequency(recording_location + '.hea')
 
-            if all(channel in channels for channel in eeg_channels):
-                data, channels = reduce_channels(data, channels, ecg_channels)
-                ECG_data, ECG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
-                #features = get_ecg_features(data)
-                #ecg_features = expand_channels(features, channels, ecg_channels).flatten()
-            else:
-                ECG_data = float('nan') * np.ones((5, 30000))
+            data, channels = reduce_channels(data, channels, ecg_channels)
+            DATA, ECG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+            ECG_data = ECG_expand_channels(DATA, channels, ecg_channels)
+            #features = get_ecg_features(data)
+            #ecg_features = expand_channels(features, channels, ecg_channels).flatten()
+
         else:
             #ecg_features = float('nan') * np.ones(10) # 5 channels * 2 features / channel
             #num_channels, num_samples = np.shape(data)
@@ -349,6 +363,21 @@ def get_recordings(data_folder, patient_id):
     # Extract features.
     #return np.hstack((patient_features, eeg_features, ecg_features))
     return EEG_data.T, ECG_data.T, EEG_sampling_frequency, ECG_sampling_frequency
+
+def ECG_expand_channels(current_data, current_channels, requested_channels):
+    if current_channels == requested_channels:
+        expanded_data = current_data
+    else:
+        num_current_channels, num_samples = np.shape(current_data)
+        num_requested_channels = len(requested_channels)
+        expanded_data = np.zeros((num_requested_channels, num_samples))
+        for i, channel in enumerate(requested_channels):
+            if channel in current_channels:
+                j = current_channels.index(channel)
+                expanded_data[i, :] = current_data[j, :]
+            else:
+                expanded_data[i, :] = float('nan') * np.ones((1, num_samples))
+    return expanded_data
 
 # short-time Fourier transform
 def STFT1(X,flag,figure_folder,j,i,y1,y2,sampling_frequency,A):
@@ -388,16 +417,20 @@ def data_reshape(model_folder,EEG_recordings, ECG_recordings, outcomes, cpcs, EE
             # dsize = output_width, output_height
             STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
 
-        ECG_x_train = ECG_recordings[j]
-        img = list()
-        for m in range(5):
-            img = STFT1(ECG_x_train[:,m],1,model_folder,j,m,outcomes[j],cpcs[j],ECG_sampling_frequency,'ECG')
-            # dsize = output_width, output_height
-            STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4    
+        # ECG_x_train = ECG_recordings[j]
+        # img = list()
+        # for m in range(5):
+        #     img = STFT1(ECG_x_train[:,m],1,model_folder,j,m,outcomes[j],cpcs[j],ECG_sampling_frequency,'ECG')
+        #     # dsize = output_width, output_height
+        #     STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4    
 
-        frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6])))
+        # frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6])))
+        frames.append(np.dstack((STFT[0], STFT[1])))
+
     # bring the segment into a better shape
-    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],7)
+    # X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],7)
+    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],2)
+
     if outcomes[0] == 'Nan':
         return X_all
     else:
@@ -426,29 +459,6 @@ def custom_fpr(y, y_hat):
 
     y = tf.cast(y, tf.float32)
     y_hat = tf.cast(y_hat, tf.float32)
-    fp = tf.reduce_sum(y_hat * (1 - y), axis=0)
-    tn = tf.reduce_sum((1 - y_hat) * (1 - y), axis=0)
-
-    fpr = fp/(fp+tn+1e-16)
-    macro_cost = tf.reduce_mean(fpr)
-
-    return macro_cost
-
-# custom metric function
-def custom_auc(y, y_hat):
-
-    y = tf.cast(y, tf.float32)
-    y_hat = tf.cast(y_hat, tf.float32)
-    y_hat_new = y_hat
-
-    fps = list()
-    tns = list()
-    for i in y_hat: # threshold
-
-        y_hat_new = torch.where(y_hat-i>0, y_hat-i, 0)
-        fps.append(tf.reduce_sum(y_hat_new * (1 - y), axis=0))
-        tns.append(tf.reduce_sum((i - y_hat) * (1 - y), axis=0))
-
     fp = tf.reduce_sum(y_hat * (1 - y), axis=0)
     tn = tf.reduce_sum((1 - y_hat) * (1 - y), axis=0)
 
@@ -508,10 +518,10 @@ def generate_cnn(k, X_all):
     #Model compiler settings
     if k ==2:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),#tf.keras.optimizers.legacy.SGD(learning_rate=0.01),#tf.keras.optimizers.Adam(0.0005),
-              loss='binary_focal_crossentropy',#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(),#custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
-              metrics=[custom_fpr,tf.keras.metrics.Recall()]) #['accuracy'])
+              loss=tf.keras.losses.BinaryCrossentropy(),#tf.keras.losses.BinaryFocalCrossentropy(apply_class_balancing=False),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(),#custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
+              metrics=[tf.keras.metrics.AUC()]) # custom_fpr,tf.keras.metrics.Recall()  #['accuracy'])
     else:
-        model.compile(optimizer = tf.keras.optimizers.Adam(0.01),
+        model.compile(optimizer = tf.keras.optimizers.Adam(0.001),
               loss='mean_squared_error', #'categorical_crossentropy',
               metrics=['mse']) #['accuracy'])        
     
@@ -562,8 +572,8 @@ def plot_figures(A, n_folds,model_history, model_folder):
         plt.plot(model_history[i].history['loss'], label = 'Training Loss')
         plt.plot(model_history[i].history['val_loss'], label = 'Validation Loss', linestyle = 'dashdot')
         if A == 'outcome':
-            plt.plot(model_history[i].history['recall'], label = 'Training recall')
-            plt.plot(model_history[i].history['val_recall'], label = 'Validation recall', linestyle = 'dashdot')     
+            plt.plot(model_history[i].history['auc'], label = 'Training AUC')
+            plt.plot(model_history[i].history['val_auc'], label = 'Validation AUC', linestyle = 'dashdot')     
             fig_name = os.path.join(model_folder, 'Trial ' + str(i+1) + ' Training metrics v.s. Validation metrics for ' + A + ' model with nested 10-fold cv.png')
         else:
             fig_name = os.path.join(model_folder, 'Trial ' + str(i+1) + ' Training Loss v.s. Validation Loss for ' + A + ' model with nested 10-fold cv.png')   
