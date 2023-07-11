@@ -100,7 +100,7 @@ def train_challenge_model(data_folder, model_folder, verbose):
     res_cpc = list()
     outcome_model_history = list()
     cpc_model_history = list()
-    num_trial = 1
+    num_trial = 5#1
     for T in range(num_trial): # run 5 times to save memory
 
         # save the models as physical files
@@ -183,9 +183,11 @@ def train_challenge_model(data_folder, model_folder, verbose):
     #     else:
     #         pass
     # shutil.copyfile(fold_best_model[Ind[np.argmin(Temp)]], outcome_name)
-    shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res)), 'outcome_model.h5'), outcome_name)
+    shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
+    print('Trial ' + str(np.argmax(res)))
+    print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
@@ -297,7 +299,16 @@ def get_recordings(data_folder, patient_id):
     # Load patient data.
     #patient_metadata = load_challenge_data(data_folder, patient_id)
     recording_ids = find_recording_files(data_folder, patient_id)
-    num_recordings = len(recording_ids)
+    reduced_recording_ids = list()
+    for i in recording_ids:
+        #print(i)
+        if int(i[9:])<72:
+            reduced_recording_ids.append(i)
+        else:
+            pass
+
+    # num_recordings = len(recording_ids)
+    num_recordings = len(reduced_recording_ids)
 
     # Extract patient features.
     #patient_features = get_patient_features(patient_metadata)
@@ -305,11 +316,15 @@ def get_recordings(data_folder, patient_id):
     # Extract EEG recordings.
     EEG_data = list()
     EEG_sampling_frequency = 500
-    eeg_channels = ['F3', 'P3', 'F4', 'P4']
+
+    # eeg_channels = ['F3', 'P3', 'F4', 'P4']
+    eeg_channels = ['F3', 'T3', 'P3', 'F4', 'T4', 'P4']
+    
     group = 'EEG'
 
     if num_recordings > 0:
-        recording_id = recording_ids[-1]
+        # recording_id = recording_ids[-1]
+        recording_id = reduced_recording_ids[-1]
         recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
         if os.path.exists(recording_location + '.hea'):
             data, channels, sampling_frequency = load_recording_data(recording_location)
@@ -318,19 +333,28 @@ def get_recordings(data_folder, patient_id):
             if all(channel in channels for channel in eeg_channels):
                 data, channels = reduce_channels(data, channels, eeg_channels)
                 data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
-                EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
+
+                # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
+                EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+
                 # data size: num_channels * num_samples 
                 #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
             else:
                 #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
                 #num_channels, num_samples = np.shape(data)
-                EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+                print('NAN 1')
+                # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+                EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
         else:
             #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
-            EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+            print('NAN 2')
+            # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+            EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
     else:
         #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
-        EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+        print('NAN 3')
+        # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+        EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
 
     # Extract ECG recordings.
     ECG_data = list()
@@ -340,7 +364,8 @@ def get_recordings(data_folder, patient_id):
     group = 'ECG'
 
     if num_recordings > 0:
-        recording_id = recording_ids[0]
+        # recording_id = recording_ids[0]
+        recording_id = reduced_recording_ids[0]
         recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
         if os.path.exists(recording_location + '.hea'):
             data, channels, sampling_frequency = load_recording_data(recording_location)
@@ -412,7 +437,8 @@ def data_reshape(model_folder,EEG_recordings, ECG_recordings, outcomes, cpcs, EE
 
         EEG_x_train = EEG_recordings[j]
         img = list()
-        for m in range(2):
+        # for m in range(2):
+        for m in range(6):
             img = STFT1(EEG_x_train[:,m],1,model_folder,j,m,outcomes[j],cpcs[j],EEG_sampling_frequency,'EEG')
             # dsize = output_width, output_height
             STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
@@ -425,11 +451,13 @@ def data_reshape(model_folder,EEG_recordings, ECG_recordings, outcomes, cpcs, EE
         #     STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4    
 
         # frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6])))
-        frames.append(np.dstack((STFT[0], STFT[1])))
+        # frames.append(np.dstack((STFT[0], STFT[1])))
+        frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5])))
 
     # bring the segment into a better shape
     # X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],7)
-    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],2)
+    #X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],2)
+    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],6)
 
     if outcomes[0] == 'Nan':
         return X_all
@@ -518,8 +546,8 @@ def generate_cnn(k, X_all):
     #Model compiler settings
     if k ==2:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),#tf.keras.optimizers.legacy.SGD(learning_rate=0.01),#tf.keras.optimizers.Adam(0.0005),
-              loss=tf.keras.losses.BinaryCrossentropy(),#tf.keras.losses.BinaryFocalCrossentropy(apply_class_balancing=False),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(),#custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
-              metrics=[tf.keras.metrics.AUC()]) # custom_fpr,tf.keras.metrics.Recall()  #['accuracy'])
+              loss=tf.keras.losses.BinaryFocalCrossentropy(alpha=0.5,apply_class_balancing=False),#tf.keras.losses.BinaryCrossentropy(),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(),#custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
+              metrics=[tf.keras.metrics.AUC()])  # custom_fpr,tf.keras.metrics.Recall()  #['accuracy'])
     else:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),
               loss='mean_squared_error', #'categorical_crossentropy',
@@ -573,10 +601,12 @@ def plot_figures(A, n_folds,model_history, model_folder):
         plt.plot(model_history[i].history['val_loss'], label = 'Validation Loss', linestyle = 'dashdot')
         if A == 'outcome':
             plt.plot(model_history[i].history['auc'], label = 'Training AUC')
-            plt.plot(model_history[i].history['val_auc'], label = 'Validation AUC', linestyle = 'dashdot')     
-            fig_name = os.path.join(model_folder, 'Trial ' + str(i+1) + ' Training metrics v.s. Validation metrics for ' + A + ' model with nested 10-fold cv.png')
+            plt.plot(model_history[i].history['val_auc'], label = 'Validation AUC', linestyle = 'dashdot')  
+            # plt.plot(model_history[i].history['recall'], label = 'Training Recall')
+            # plt.plot(model_history[i].history['val_recall'], label = 'Validation Recall', linestyle = 'dashdot')      
+            fig_name = os.path.join(model_folder, 'Trial ' + str(i) + ' Training metrics v.s. Validation metrics for ' + A + ' model with nested 10-fold cv.png')
         else:
-            fig_name = os.path.join(model_folder, 'Trial ' + str(i+1) + ' Training Loss v.s. Validation Loss for ' + A + ' model with nested 10-fold cv.png')   
+            fig_name = os.path.join(model_folder, 'Trial ' + str(i) + ' Training Loss v.s. Validation Loss for ' + A + ' model with nested 10-fold cv.png')   
         plt.legend()
         #fig_name = os.path.join(model_folder, 'Trial ' + str(T), 'Training Loss v.s. Validation Loss for ' + A + ' model with nested holdout.png')
         plt.savefig(fig_name, dpi=200, bbox_inches='tight')
