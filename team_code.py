@@ -32,9 +32,11 @@ import shutil
 import random
 #from collections import Counter
 
-#import resource
-#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import gc
+
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -101,53 +103,56 @@ def train_challenge_model(data_folder, model_folder, verbose):
     outcome_model_history = list()
     cpc_model_history = list()
     num_trial = 5#1
-    for T in range(num_trial): # run 5 times to save memory
 
-        # save the models as physical files
-        os.makedirs(os.path.join(model_folder, 'Trial ' + str(T)), exist_ok=True) # Create a folder for the Challenge outputs if it does not already exist.
+    res, outcome_model_history, res_cpc, cpc_model_history = model_training(num_trial,model_folder,verbose,X_all,y1_all,y2_all,outcome_model,cpc_model,early_stopping)
 
-        # outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), '{epoch:03d}_{val_recall:.4f}_' + 'outcome_model.h5')
-        # oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=False)
-        outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), 'outcome_model.h5')
-        oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=True)
+    # for T in range(num_trial): # run 5 times to save memory
 
-        cpc_filename = os.path.join(model_folder, 'Trial ' + str(T), 'cpc_model.h5')
-        cpc_model_checkpoint = ModelCheckpoint(filepath = cpc_filename, verbose=1, save_best_only=True)
+    #     # save the models as physical files
+    #     os.makedirs(os.path.join(model_folder, 'Trial ' + str(T)), exist_ok=True) # Create a folder for the Challenge outputs if it does not already exist.
 
-        # model training
-        if verbose >= 1:
-            print('Trial '+ str(T) + ': Training the Challenge models on the Challenge data...')
+    #     # outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), '{epoch:03d}_{val_recall:.4f}_' + 'outcome_model.h5')
+    #     # oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=False)
+    #     outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), 'outcome_model.h5')
+    #     oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=True)
 
-        # dt = list()
-        # t1 = time.time()
-        epochs = 150#300#200#120
-        batch_size = 32#64#32#64
+    #     cpc_filename = os.path.join(model_folder, 'Trial ' + str(T), 'cpc_model.h5')
+    #     cpc_model_checkpoint = ModelCheckpoint(filepath = cpc_filename, verbose=1, save_best_only=True)
 
-        X_train = X_all
-        y1_train = y1_all
-        y2_train = y2_all
-        X_train = np.asarray(X_train).reshape(-1, np.shape(X_train[0])[0],np.shape(X_train[0])[1],np.shape(X_train[0])[2])
-        y1_train = np.asarray(y1_train)
-        y2_train = np.asarray(y2_train)
+    #     # model training
+    #     if verbose >= 1:
+    #         print('Trial '+ str(T) + ': Training the Challenge models on the Challenge data...')
+
+    #     # dt = list()
+    #     # t1 = time.time()
+    #     epochs = 150#300#200#120
+    #     batch_size = 32#64#32#64
+
+    #     X_train = X_all
+    #     y1_train = y1_all
+    #     y2_train = y2_all
+    #     X_train = np.asarray(X_train).reshape(-1, np.shape(X_train[0])[0],np.shape(X_train[0])[1],np.shape(X_train[0])[2])
+    #     y1_train = np.asarray(y1_train)
+    #     y2_train = np.asarray(y2_train)
     
-        # one-hot convertion
-        y1_train = tf.keras.utils.to_categorical(y1_train)
-        y2_train = tf.keras.utils.to_categorical(y2_train-1)   
+    #     # one-hot convertion
+    #     y1_train = tf.keras.utils.to_categorical(y1_train)
+    #     y2_train = tf.keras.utils.to_categorical(y2_train-1)   
 
-        # train models   
+    #     # train models   
 
-        # outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
-        outcome_results, outcome_val_score= fit_and_eval(int(1),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+    #     # outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+    #     outcome_results, outcome_val_score= fit_and_eval(int(1),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
 
-        res.append(outcome_val_score[1])
-        outcome_model_history.append(outcome_results)
-        cpc_results, cpc_val_score = fit_and_eval(int(1),X_train, y2_train, cpc_model, epochs, batch_size, early_stopping, cpc_model_checkpoint)
-        res_cpc.append(cpc_val_score[1])
-        cpc_model_history.append(cpc_results)
+    #     res.append(outcome_val_score[1])
+    #     outcome_model_history.append(outcome_results)
+    #     cpc_results, cpc_val_score = fit_and_eval(int(1),X_train, y2_train, cpc_model, epochs, batch_size, early_stopping, cpc_model_checkpoint)
+    #     res_cpc.append(cpc_val_score[1])
+    #     cpc_model_history.append(cpc_results)
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
-    #plot_figures('outcome', num_trial, outcome_model_history, model_folder)
-    #plot_figures('cpc', num_trial, cpc_model_history, model_folder)
+    plot_figures('outcome', num_trial, outcome_model_history, model_folder)
+    plot_figures('cpc', num_trial, cpc_model_history, model_folder)
 
     # save the optimal model
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
@@ -186,8 +191,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
-    #print('Trial ' + str(np.argmax(res)))
-    #print('Trial ' + str(np.argmin(res_cpc)))
+    print('Trial ' + str(np.argmax(res)))
+    print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
@@ -294,6 +299,53 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
 
     return data, resampling_frequency
 
+def EEG_reshape(num_recordings,reduced_recording_ids,data_folder,patient_id,group,eeg_channels):
+
+    EEG_data_list = list()
+
+    for i in range(num_recordings):
+
+        # recording_id = reduced_recording_ids[-1]
+        recording_id = reduced_recording_ids[i]
+        recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+        if os.path.exists(recording_location + '.hea'):
+            data, channels, sampling_frequency = load_recording_data(recording_location)
+            utility_frequency = get_utility_frequency(recording_location + '.hea')
+
+            if all(channel in channels for channel in eeg_channels):
+                data, channels = reduce_channels(data, channels, eeg_channels)
+                data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+
+                # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
+                # EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+                EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]])) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+
+                # data size: num_channels * num_samples 
+                #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
+            else:
+                #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+                #num_channels, num_samples = np.shape(data)
+                print('NAN 1')
+                # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+                # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+                EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
+
+            del data
+            del channels
+            del sampling_frequency
+            gc.collect()
+
+        else:
+            #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+            print('NAN 2')
+            # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+            # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+            EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
+        
+    EEG_data = np.hstack(EEG_data_list)
+
+    return EEG_data
+
 # Extract reshaped recordings.
 def get_recordings(data_folder, patient_id):
     # Load patient data.
@@ -323,33 +375,52 @@ def get_recordings(data_folder, patient_id):
     group = 'EEG'
 
     if num_recordings > 0:
-        # recording_id = recording_ids[-1]
-        recording_id = reduced_recording_ids[-1]
-        recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
-        if os.path.exists(recording_location + '.hea'):
-            data, channels, sampling_frequency = load_recording_data(recording_location)
-            utility_frequency = get_utility_frequency(recording_location + '.hea')
 
-            if all(channel in channels for channel in eeg_channels):
-                data, channels = reduce_channels(data, channels, eeg_channels)
-                data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+        EEG_data = EEG_reshape(num_recordings,reduced_recording_ids,data_folder,patient_id,group,eeg_channels)
+        
+        # EEG_data_list = list()
 
-                # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
-                EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+        # for i in range(num_recordings):
 
-                # data size: num_channels * num_samples 
-                #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
-            else:
-                #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
-                #num_channels, num_samples = np.shape(data)
-                print('NAN 1')
-                # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
-                EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
-        else:
-            #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
-            print('NAN 2')
-            # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
-            EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+        #     # recording_id = reduced_recording_ids[-1]
+        #     recording_id = reduced_recording_ids[i]
+        #     recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+        #     if os.path.exists(recording_location + '.hea'):
+        #         data, channels, sampling_frequency = load_recording_data(recording_location)
+        #         utility_frequency = get_utility_frequency(recording_location + '.hea')
+
+        #         if all(channel in channels for channel in eeg_channels):
+        #             data, channels = reduce_channels(data, channels, eeg_channels)
+        #             data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+
+        #             # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
+        #             # EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+        #             EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]])) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+
+        #             # data size: num_channels * num_samples 
+        #             #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
+        #         else:
+        #             #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+        #             #num_channels, num_samples = np.shape(data)
+        #             print('NAN 1')
+        #             # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+        #             # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+        #             EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
+
+        #         del data
+        #         del channels
+        #         del sampling_frequency
+        #         gc.collect()
+
+        #     else:
+        #         #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+        #         print('NAN 2')
+        #         # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+        #         # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+        #         EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
+        
+        # EEG_data = np.hstack(EEG_data_list)
+
     else:
         #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
         print('NAN 3')
@@ -573,6 +644,60 @@ def fit_and_eval(flag,X,y,model,epochs,batch_size,early_stopping,model_checkpoin
     print("Val_score: ", val_score)
     
     return results, val_score#, [indices_train, indices_val]
+
+def model_training(num_trial,model_folder,verbose,X_all,y1_all,y2_all,outcome_model,cpc_model,early_stopping):
+
+    res = list()
+    outcome_model_history = list()
+    res_cpc = list()
+    cpc_model_history = list()
+
+    for T in range(num_trial): # run 5 times to save memory
+
+        # save the models as physical files
+        os.makedirs(os.path.join(model_folder, 'Trial ' + str(T)), exist_ok=True) # Create a folder for the Challenge outputs if it does not already exist.
+
+        # outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), '{epoch:03d}_{val_recall:.4f}_' + 'outcome_model.h5')
+        # oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=False)
+        outcome_filename = os.path.join(model_folder, 'Trial ' + str(T), 'outcome_model.h5')
+        oucome_model_checkpoint = ModelCheckpoint(filepath = outcome_filename, verbose=1, save_best_only=True)
+
+        cpc_filename = os.path.join(model_folder, 'Trial ' + str(T), 'cpc_model.h5')
+        cpc_model_checkpoint = ModelCheckpoint(filepath = cpc_filename, verbose=1, save_best_only=True)
+
+        # model training
+        if verbose >= 1:
+            print('Trial '+ str(T) + ': Training the Challenge models on the Challenge data...')
+
+        # dt = list()
+        # t1 = time.time()
+        epochs = 150#300#200#120
+        batch_size = 32#64#32#64
+
+        X_train = X_all
+        y1_train = y1_all
+        y2_train = y2_all
+        X_train = np.asarray(X_train).reshape(-1, np.shape(X_train[0])[0],np.shape(X_train[0])[1],np.shape(X_train[0])[2])
+        y1_train = np.asarray(y1_train)
+        y2_train = np.asarray(y2_train)
+    
+        # one-hot convertion
+        y1_train = tf.keras.utils.to_categorical(y1_train)
+        y2_train = tf.keras.utils.to_categorical(y2_train-1)   
+
+        # train models   
+
+        # outcome_results, outcome_val_score= fit_and_eval(int(0),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+        outcome_results, outcome_val_score= fit_and_eval(int(1),X_train, y1_train, outcome_model, epochs, batch_size, early_stopping, oucome_model_checkpoint)
+
+        res.append(outcome_val_score[1])
+        outcome_model_history.append(outcome_results)
+        cpc_results, cpc_val_score = fit_and_eval(int(1),X_train, y2_train, cpc_model, epochs, batch_size, early_stopping, cpc_model_checkpoint)
+        res_cpc.append(cpc_val_score[1])
+        cpc_model_history.append(cpc_results)
+
+    return res, outcome_model_history, res_cpc, cpc_model_history
+
 
 def plot_figures(A, n_folds,model_history, model_folder):
 
