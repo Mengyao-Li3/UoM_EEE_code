@@ -34,9 +34,9 @@ import random
 
 import gc
 
-#import resource
-#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -151,8 +151,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     #     cpc_model_history.append(cpc_results)
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
-    #plot_figures('outcome', num_trial, outcome_model_history, model_folder)
-    #plot_figures('cpc', num_trial, cpc_model_history, model_folder)
+    plot_figures('outcome', num_trial, outcome_model_history, model_folder)
+    plot_figures('cpc', num_trial, cpc_model_history, model_folder)
 
     # save the optimal model
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
@@ -191,8 +191,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
-    #print('Trial ' + str(np.argmax(res)))
-    #print('Trial ' + str(np.argmin(res_cpc)))
+    print('Trial ' + str(np.argmax(res)))
+    print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
@@ -376,50 +376,55 @@ def get_recordings(data_folder, patient_id):
 
     if num_recordings > 0:
 
-        EEG_data = EEG_reshape(num_recordings,reduced_recording_ids,data_folder,patient_id,group,eeg_channels)
+        #EEG_data = EEG_reshape(num_recordings,reduced_recording_ids,data_folder,patient_id,group,eeg_channels)
         
-        # EEG_data_list = list()
+        EEG_data_list = list()
 
-        # for i in range(num_recordings):
+        if num_recordings < 6:
+            k = 0
+        else:
+            k = num_recordings-6
 
-        #     # recording_id = reduced_recording_ids[-1]
-        #     recording_id = reduced_recording_ids[i]
-        #     recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
-        #     if os.path.exists(recording_location + '.hea'):
-        #         data, channels, sampling_frequency = load_recording_data(recording_location)
-        #         utility_frequency = get_utility_frequency(recording_location + '.hea')
+        for i in range(k,num_recordings):
 
-        #         if all(channel in channels for channel in eeg_channels):
-        #             data, channels = reduce_channels(data, channels, eeg_channels)
-        #             data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+            # recording_id = reduced_recording_ids[-1]
+            recording_id = reduced_recording_ids[i]
+            recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+            if os.path.exists(recording_location + '.hea'):
+                data, channels, sampling_frequency = load_recording_data(recording_location)
+                utility_frequency = get_utility_frequency(recording_location + '.hea')
 
-        #             # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
-        #             # EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
-        #             EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]])) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+                if all(channel in channels for channel in eeg_channels):
+                    data, channels = reduce_channels(data, channels, eeg_channels)
+                    data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
 
-        #             # data size: num_channels * num_samples 
-        #             #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
-        #         else:
-        #             #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
-        #             #num_channels, num_samples = np.shape(data)
-        #             print('NAN 1')
-        #             # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
-        #             # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
-        #             EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
+                    # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
+                    # EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+                    EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]])) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
 
-        #         del data
-        #         del channels
-        #         del sampling_frequency
-        #         gc.collect()
+                    # data size: num_channels * num_samples 
+                    #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
+                else:
+                    #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+                    #num_channels, num_samples = np.shape(data)
+                    print('NAN 1')
+                    # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+                    # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+                    EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
 
-        #     else:
-        #         #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
-        #         print('NAN 2')
-        #         # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
-        #         # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
-        #         EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
+                del data
+                del channels
+                del sampling_frequency
+                gc.collect()
+
+            else:
+                #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
+                print('NAN 2')
+                # EEG_data = float('nan') * np.ones((2, 30000)) # 2 channels * 500 Hz * 60 s
+                # EEG_data = float('nan') * np.ones((6, 30000)) # 6 channels * 500 Hz * 60 s
+                EEG_data_list.append(float('nan') * np.ones((6, 30000))) # 6 channels * 500 Hz * 60 s
         
-        # EEG_data = np.hstack(EEG_data_list)
+        EEG_data = np.hstack(EEG_data_list)
 
     else:
         #eeg_features = float('nan') * np.ones(8) # 2 bipolar channels * 4 features / channel
