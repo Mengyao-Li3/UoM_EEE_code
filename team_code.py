@@ -380,10 +380,12 @@ def get_recordings(data_folder, patient_id):
         
         EEG_data_list = list()
 
-        if num_recordings < 6:
+        if num_recordings < 2:
             k = 0
         else:
-            k = num_recordings-6
+            k = num_recordings-2
+
+        # k = num_recordings-1
 
         for i in range(k,num_recordings):
 
