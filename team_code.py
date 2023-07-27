@@ -34,9 +34,9 @@ import random
 
 import gc
 
-#import resource
-#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -151,8 +151,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     #     cpc_model_history.append(cpc_results)
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
-    #plot_figures('outcome', num_trial, outcome_model_history, model_folder)
-    #plot_figures('cpc', num_trial, cpc_model_history, model_folder)
+    plot_figures('outcome', num_trial, outcome_model_history, model_folder)
+    plot_figures('cpc', num_trial, cpc_model_history, model_folder)
 
     # save the optimal model
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
@@ -191,8 +191,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
-    #print('Trial ' + str(np.argmax(res)))
-    #print('Trial ' + str(np.argmin(res_cpc)))
+    print('Trial ' + str(np.argmax(res)))
+    print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
@@ -279,10 +279,12 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
     data = mne.filter.filter_data(data, sampling_frequency, passband[0], passband[1], n_jobs=4, verbose='error')
 
     # Resample the data.
-    if sampling_frequency % 2 == 0:
-        resampling_frequency = 128
-    else:
-        resampling_frequency = 125
+    # if sampling_frequency % 2 == 0:
+    #     resampling_frequency = 128
+    # else:
+    #     resampling_frequency = 125
+    resampling_frequency = 100
+
     lcm = np.lcm(int(round(sampling_frequency)), int(round(resampling_frequency)))
     up = int(round(lcm / sampling_frequency))
     down = int(round(lcm / resampling_frequency))
@@ -293,7 +295,8 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
     min_value = np.min(data)
     max_value = np.max(data)
     if min_value != max_value:
-        data = 2.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value))
+        # data = 2.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value))
+        data = 1.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value)) #Scale the data to the interval [0, 1].
     else:
         data = 0 * data
 
