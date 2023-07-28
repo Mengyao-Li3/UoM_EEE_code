@@ -1,1 +1,1 @@
-Please download the folder 'Autoencoder_Challenge' from https://github.com/Non-Invasive-Bioelectronics-Lab/Modified_Autoencoder4_challenge.git, and then put it under the same directory with team_code.py.
+Please download the folder 'Autoencoder_Mengyao_Challenge' from https://github.com/Non-Invasive-Bioelectronics-Lab/Modified_Autoencoder4_challenge.git, and then put it under the same directory with team_code.py.
