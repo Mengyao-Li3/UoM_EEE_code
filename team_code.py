@@ -34,9 +34,9 @@ import random
 
 import gc
 
-#import resource
-#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -151,8 +151,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     #     cpc_model_history.append(cpc_results)
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
-    #plot_figures('outcome', num_trial, outcome_model_history, model_folder)
-    #plot_figures('cpc', num_trial, cpc_model_history, model_folder)
+    plot_figures('outcome', num_trial, outcome_model_history, model_folder)
+    plot_figures('cpc', num_trial, cpc_model_history, model_folder)
 
     # save the optimal model
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
@@ -191,8 +191,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
-    #print('Trial ' + str(np.argmax(res)))
-    #print('Trial ' + str(np.argmin(res_cpc)))
+    print('Trial ' + str(np.argmax(res)))
+    print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
@@ -300,7 +300,44 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
     else:
         data = 0 * data
 
-    return data, resampling_frequency
+    ### artifact removal with autoencoder
+
+    # load model from local directory
+    autoencoder = tf.keras.models.load_model('Autoencoder_Mengyao_Challenge')
+    autoencoder.summary()
+
+    new_data = data # num_channels * num_samples
+    frame_size = int(500) # 100 Hz * 5 s
+    hop_size = int(500) # 100 Hz * 5 s, non-overlapping
+    for j in range(len(data)):
+        data_temp = data[j]
+        recon_data = list()
+        for i in range(0, len(data_temp) - frame_size + 1, hop_size): 
+            # run autoencoder model 
+            encoded_layer = autoencoder.encoder(np.asarray(data_temp[i:i+frame_size]).reshape(-1,500,1)).numpy()
+            decoded_layer = autoencoder.decoder(encoded_layer).numpy() # reconstructed EEG data
+            #print(np.shape(decoded_layer.flatten()))
+            recon_data.extend(decoded_layer.flatten())
+        if len(data_temp)%500 != 0:
+            encoded_layer = autoencoder.encoder(np.asarray(data_temp[len(data_temp)-500:]).reshape(-1,500,1)).numpy()
+            decoded_layer = autoencoder.decoder(encoded_layer).numpy() # reconstructed EEG data
+            recon_data.extend(decoded_layer.flatten()[500-len(data_temp)%500:])
+        else:
+            pass
+
+        print(len(new_data[j]),len(recon_data))
+        new_data[j] = recon_data
+        # new_data[j][:len(recon_data)] = recon_data
+
+        # if len(new_data[j]) > len(recon_data):
+        #     for k in range(len(new_data[j])-len(recon_data)):
+        #         new_data[j] = np.delete(new_data[j],[-1])
+        # else:
+        #     pass
+        #print(len(new_data[j]),len(recon_data))
+        
+    return new_data, resampling_frequency
+    # return data, resampling_frequency
 
 def EEG_reshape(num_recordings,reduced_recording_ids,data_folder,patient_id,group,eeg_channels):
 
@@ -383,12 +420,12 @@ def get_recordings(data_folder, patient_id):
         
         EEG_data_list = list()
 
-        if num_recordings < 2:
-            k = 0
-        else:
-            k = num_recordings-2
+        # if num_recordings < 2:
+        #     k = 0
+        # else:
+        #     k = num_recordings-2
 
-        # k = num_recordings-1
+        k = num_recordings-1
 
         for i in range(k,num_recordings):
 
