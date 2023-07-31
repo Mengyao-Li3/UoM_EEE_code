@@ -34,9 +34,9 @@ import random
 
 import gc
 
-import resource
-soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+#import resource
+#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -151,8 +151,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     #     cpc_model_history.append(cpc_results)
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
-    plot_figures('outcome', num_trial, outcome_model_history, model_folder)
-    plot_figures('cpc', num_trial, cpc_model_history, model_folder)
+    #plot_figures('outcome', num_trial, outcome_model_history, model_folder)
+    #plot_figures('cpc', num_trial, cpc_model_history, model_folder)
 
     # save the optimal model
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
@@ -191,8 +191,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
-    print('Trial ' + str(np.argmax(res)))
-    print('Trial ' + str(np.argmin(res_cpc)))
+    #print('Trial ' + str(np.argmax(res)))
+    #print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
