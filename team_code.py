@@ -34,9 +34,9 @@ import random
 
 import gc
 
-#import resource
-#soft, hard = resource.getrlimit(resource.RLIMIT_AS)
-#resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
+import resource
+soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+resource.setrlimit(resource.RLIMIT_AS, (68719476736, hard)) # set the maximum memory usage: 64 GB
 
 ################################################################################
 #
@@ -151,8 +151,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     #     cpc_model_history.append(cpc_results)
 
     ##### plot training and validation accuracy and loss for outcome model and cpc model
-    #plot_figures('outcome', num_trial, outcome_model_history, model_folder)
-    #plot_figures('cpc', num_trial, cpc_model_history, model_folder)
+    plot_figures('outcome', num_trial, outcome_model_history, model_folder)
+    plot_figures('cpc', num_trial, cpc_model_history, model_folder)
 
     # save the optimal model
     os.makedirs(os.path.join(model_folder, 'Optimal'), exist_ok=True)
@@ -191,8 +191,8 @@ def train_challenge_model(data_folder, model_folder, verbose):
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmax(res)), 'outcome_model.h5'), outcome_name)
 
     shutil.copyfile(os.path.join(model_folder, 'Trial ' + str(np.argmin(res_cpc)), 'cpc_model.h5'), cpc_name)
-    #print('Trial ' + str(np.argmax(res)))
-    #print('Trial ' + str(np.argmin(res_cpc)))
+    print('Trial ' + str(np.argmax(res)))
+    print('Trial ' + str(np.argmin(res_cpc)))
     print('Save the optimal model finished.')
 
     # index = np.argmax(res)
@@ -283,7 +283,7 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
     #     resampling_frequency = 128
     # else:
     #     resampling_frequency = 125
-    resampling_frequency = 100
+    resampling_frequency = 100#200#100
 
     lcm = np.lcm(int(round(sampling_frequency)), int(round(resampling_frequency)))
     up = int(round(lcm / sampling_frequency))
@@ -291,44 +291,48 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
     resampling_frequency = sampling_frequency * up / down
     data = scipy.signal.resample_poly(data, up, down, axis=1)
 
-    # Scale the data to the interval [-1, 1].
-    min_value = np.min(data)
-    max_value = np.max(data)
-    if min_value != max_value:
-        # data = 2.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value))
-        data = 1.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value)) #Scale the data to the interval [0, 1].
-    else:
-        data = 0 * data
+    # # Scale the data to the interval [-1, 1].
+    # min_value = np.min(data)
+    # max_value = np.max(data)
+    # if min_value != max_value:
+    #     # data = 2.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value))
+    #     data = 1.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value)) #Scale the data to the interval [0, 1].
+    # else:
+    #     data = 0 * data
 
     ### artifact removal with autoencoder
 
     # load model from local directory
     autoencoder = tf.keras.models.load_model('Modified_Autoencoder4_challenge/saved_model/Autoencoder_Mengyao_Challenge') 
+    #autoencoder = tf.keras.models.load_model('Autoencoder/saved_model/Autoencoder_CNN_model_v4') 
     autoencoder.summary()
 
     new_data = data # num_channels * num_samples
-    frame_size = int(500) # 100 Hz * 5 s
-    hop_size = int(500) # 100 Hz * 5 s, non-overlapping
+    len_seg = 100*5#200*4
+    frame_size = int(len_seg) # 100 Hz * 5 s
+    hop_size = int(len_seg) # 100 Hz * 5 s, non-overlapping
+    #print(np.shape(data))
     for j in range(len(data)):
+        #print(j)
         data_temp = data[j]
         recon_data = list()
         for i in range(0, len(data_temp) - frame_size + 1, hop_size): 
             # run autoencoder model 
-            encoded_layer = autoencoder.encoder(np.asarray(data_temp[i:i+frame_size]).reshape(-1,500,1)).numpy()
+            encoded_layer = autoencoder.encoder(np.asarray(norm_data(data_temp[i:i+frame_size],1)).reshape(-1,len_seg,1)).numpy()
             decoded_layer = autoencoder.decoder(encoded_layer).numpy() # reconstructed EEG data
             #print(np.shape(decoded_layer.flatten()))
-            recon_data.extend(decoded_layer.flatten())
-        if len(data_temp)%500 != 0:
+            recon_data.extend(norm_data(decoded_layer.flatten(),2))
+        if len(data_temp)%len_seg != 0:
             ext_data = data_temp
-            while len(ext_data) < 500:
+            while len(ext_data) < len_seg:
                 #data_temp.extend(data_temp)
                 ext_data = np.tile(ext_data,2)
-            if len(data_temp)<500:
-                encoded_layer = autoencoder.encoder(np.asarray(ext_data[len(ext_data)-500:]).reshape(-1,500,1)).numpy()
+            if len(data_temp)<len_seg:
+                encoded_layer = autoencoder.encoder(np.asarray(norm_data(ext_data[len(ext_data)-len_seg:],1)).reshape(-1,len_seg,1)).numpy()
             else:
-                encoded_layer = autoencoder.encoder(np.asarray(data_temp[len(data_temp)-500:]).reshape(-1,500,1)).numpy()
+                encoded_layer = autoencoder.encoder(np.asarray(norm_data(data_temp[len(data_temp)-len_seg:],1)).reshape(-1,len_seg,1)).numpy()
             decoded_layer = autoencoder.decoder(encoded_layer).numpy() # reconstructed EEG data
-            recon_data.extend(decoded_layer.flatten()[500-len(data[j])%500:])
+            recon_data.extend(norm_data(decoded_layer.flatten()[len_seg-len(data[j])%len_seg:],2))
         else:
             pass
 
@@ -345,6 +349,17 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
         
     return new_data, resampling_frequency
     # return data, resampling_frequency
+
+def norm_data(data,data_range):
+    # Scale the data to the interval [-1, 1].
+    min_value = np.min(data)
+    max_value = np.max(data)
+    if min_value != max_value:
+        # data = 2.0 / (max_value - min_value) * (data - 0.5 * (min_value + max_value))
+        data = data_range / (max_value - min_value) * (data - 0.5 * (min_value + max_value)) #Scale the data to the interval [0, 1].
+    else:
+        data = 0 * data
+    return data
 
 def EEG_reshape(num_recordings,reduced_recording_ids,data_folder,patient_id,group,eeg_channels):
 
@@ -427,10 +442,10 @@ def get_recordings(data_folder, patient_id):
         
         EEG_data_list = list()
 
-        # if num_recordings < 2:
+        # if num_recordings < 3:
         #     k = 0
         # else:
-        #     k = num_recordings-2
+        #     k = num_recordings-3
 
         k = num_recordings-1
 
@@ -439,13 +454,16 @@ def get_recordings(data_folder, patient_id):
             # recording_id = reduced_recording_ids[-1]
             recording_id = reduced_recording_ids[i]
             recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+            print(recording_location)
             if os.path.exists(recording_location + '.hea'):
                 data, channels, sampling_frequency = load_recording_data(recording_location)
                 utility_frequency = get_utility_frequency(recording_location + '.hea')
 
                 if all(channel in channels for channel in eeg_channels):
                     data, channels = reduce_channels(data, channels, eeg_channels)
+                    #print(1,np.shape(data))
                     data, EEG_sampling_frequency = preprocess_data(data, sampling_frequency, utility_frequency)
+                    #print(2,np.shape(data))
 
                     # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
                     # EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
@@ -492,6 +510,7 @@ def get_recordings(data_folder, patient_id):
         # recording_id = recording_ids[0]
         recording_id = reduced_recording_ids[0]
         recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
+        print(recording_location)
         if os.path.exists(recording_location + '.hea'):
             data, channels, sampling_frequency = load_recording_data(recording_location)
             utility_frequency = get_utility_frequency(recording_location + '.hea')
@@ -671,7 +690,7 @@ def generate_cnn(k, X_all):
     #Model compiler settings
     if k ==2:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),#tf.keras.optimizers.legacy.SGD(learning_rate=0.01),#tf.keras.optimizers.Adam(0.0005),
-              loss=tf.keras.losses.BinaryFocalCrossentropy(alpha=0.5,apply_class_balancing=False),#tf.keras.losses.BinaryCrossentropy(),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(),#custom_loss, #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
+              loss=custom_loss,#tf.keras.losses.BinaryFocalCrossentropy(alpha=0.5,apply_class_balancing=False),#tf.keras.losses.BinaryCrossentropy(),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(), #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
               metrics=[tf.keras.metrics.AUC()])  # custom_fpr,tf.keras.metrics.Recall()  #['accuracy'])
     else:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),

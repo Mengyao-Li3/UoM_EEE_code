@@ -12,3 +12,4 @@ RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 RUN pip install -r requirements.txt
 
 RUN git clone https://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@github.com/Non-Invasive-Bioelectronics-Lab/Modified_Autoencoder4_challenge.git
+#RUN git clone https://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@github.com/Non-Invasive-Bioelectronics-Lab/Autoencoder.git
