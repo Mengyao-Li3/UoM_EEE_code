@@ -321,7 +321,7 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
             encoded_layer = autoencoder.encoder(np.asarray(norm_data(data_temp[i:i+frame_size],1)).reshape(-1,len_seg,1)).numpy()
             decoded_layer = autoencoder.decoder(encoded_layer).numpy() # reconstructed EEG data
             #print(np.shape(decoded_layer.flatten()))
-            recon_data.extend(norm_data(decoded_layer.flatten(),2))
+            recon_data.extend(decoded_layer.flatten())
         if len(data_temp)%len_seg != 0:
             ext_data = data_temp
             while len(ext_data) < len_seg:
@@ -332,7 +332,7 @@ def preprocess_data(data, sampling_frequency, utility_frequency):
             else:
                 encoded_layer = autoencoder.encoder(np.asarray(norm_data(data_temp[len(data_temp)-len_seg:],1)).reshape(-1,len_seg,1)).numpy()
             decoded_layer = autoencoder.decoder(encoded_layer).numpy() # reconstructed EEG data
-            recon_data.extend(norm_data(decoded_layer.flatten()[len_seg-len(data[j])%len_seg:],2))
+            recon_data.extend(decoded_layer.flatten()[len_seg-len(data[j])%len_seg:])
         else:
             pass
 
@@ -554,20 +554,20 @@ def STFT1(X,flag,figure_folder,j,i,y1,y2,sampling_frequency,A):
     f,t,Zxx = signal.stft(X,sampling_frequency)
     Zxx = np.abs(Zxx)
     
-    # if flag ==1:
-    #     plt.clf()
-    #     c=plt.pcolormesh(t, f, Zxx)
-    #     cb = plt.colorbar(c)
-    #     cb.set_label('Power/Frequency [dB/Hz]')
-    #     plt.title('STFT Diagram')
-    #     plt.ylabel('Frequency [Hz]')
-    #     plt.xlabel('Time [sec]')
-    #     os.makedirs(os.path.join(figure_folder, 'STFT figures'), exist_ok=True)
-    #     filename = os.path.join(figure_folder, 'STFT figures', A+'_'+str(y1)+'_'+str(y2)+'_'+str(j)+'_'+str(i)+'.png')
-    #     plt.savefig(filename)
-    #     plt.close()
-    # else:
-    #     pass
+    if flag ==1:
+        plt.clf()
+        c=plt.pcolormesh(t, f, Zxx)
+        cb = plt.colorbar(c)
+        cb.set_label('Power/Frequency [dB/Hz]')
+        plt.title('STFT Diagram')
+        plt.ylabel('Frequency [Hz]')
+        plt.xlabel('Time [sec]')
+        os.makedirs(os.path.join(figure_folder, 'STFT figures'), exist_ok=True)
+        filename = os.path.join(figure_folder, 'STFT figures', A+'_'+str(y1)+'_'+str(y2)+'_'+str(j)+'_'+str(i)+'.png')
+        plt.savefig(filename)
+        plt.close()
+    else:
+        pass
     
     return Zxx
 
@@ -690,7 +690,7 @@ def generate_cnn(k, X_all):
     #Model compiler settings
     if k ==2:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),#tf.keras.optimizers.legacy.SGD(learning_rate=0.01),#tf.keras.optimizers.Adam(0.0005),
-              loss=custom_loss,#tf.keras.losses.BinaryFocalCrossentropy(alpha=0.5,apply_class_balancing=False),#tf.keras.losses.BinaryCrossentropy(),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(), #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
+              loss=tf.keras.losses.BinaryFocalCrossentropy(alpha=0.5,apply_class_balancing=False),#custom_loss,#tf.keras.losses.BinaryCrossentropy(),#'binary_crossentropy',#tf.keras.losses.SparseCategoricalCrossentropy(), #tfr.keras.losses.ApproxNDCGLoss(), #'categorical_crossentropy',
               metrics=[tf.keras.metrics.AUC()])  # custom_fpr,tf.keras.metrics.Recall()  #['accuracy'])
     else:
         model.compile(optimizer = tf.keras.optimizers.Adam(0.001),
