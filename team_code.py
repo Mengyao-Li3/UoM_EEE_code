@@ -102,7 +102,7 @@ def train_challenge_model(data_folder, model_folder, verbose):
     res_cpc = list()
     outcome_model_history = list()
     cpc_model_history = list()
-    num_trial = 20#15#10#5#1
+    num_trial = 5#20#15#10#5#1
 
     res, outcome_model_history, res_cpc, cpc_model_history = model_training(num_trial,model_folder,verbose,X_all,y1_all,y2_all,outcome_model,cpc_model,early_stopping)
 
@@ -434,8 +434,8 @@ def get_recordings(data_folder, patient_id):
     EEG_sampling_frequency = 100
 
     # eeg_channels = ['F3', 'P3', 'F4', 'P4']
-    # eeg_channels = ['F3', 'T3', 'P3', 'F4', 'T4', 'P4']
-    eeg_channels = ['Fp1','F7', 'T3', 'T5', 'O1', 'Fp2','F8', 'T4', 'T6', 'O2', 'F3',
+    eeg_channels = ['F3', 'T3', 'P3', 'F4', 'T4', 'P4']
+    #eeg_channels = ['Fp1','F7', 'T3', 'T5', 'O1', 'Fp2','F8', 'T4', 'T6', 'O2', 'F3',
                 'C3', 'P3', 'F4', 'C4', 'P4', 'Fz', 'Cz', 'Pz']
     
     group = 'EEG'
@@ -451,12 +451,16 @@ def get_recordings(data_folder, patient_id):
         # else:
         #     k = num_recordings-3
 
-        k = num_recordings-1
+        #k = num_recordings-1
 
-        for i in range(k,num_recordings):
+        #for i in range(k,num_recordings):
+        for i in range(num_recordings):
 
             # recording_id = reduced_recording_ids[-1]
-            recording_id = reduced_recording_ids[i]
+            
+            #recording_id = reduced_recording_ids[i]
+            recording_id = reduced_recording_ids[0]
+            
             recording_location = os.path.join(data_folder, patient_id, '{}_{}'.format(recording_id, group))
             #print(recording_location)
             if os.path.exists(recording_location + '.hea'):
@@ -471,8 +475,8 @@ def get_recordings(data_folder, patient_id):
 
                     # EEG_data = np.array([data[0, :] - data[1, :], data[2, :] - data[3, :]]) # Convert to bipolar montage: F3-P3 and F4-P4
                     # EEG_data = np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]]) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
-                    # EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]])) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
-                    EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[2, :] - data[3, :], data[3, :] - data[4, :], data[5, :] - data[6, :], data[6, :] - data[7, :], data[7, :] - data[8, :], data[8, :] - data[9, :], data[0, :] - data[10, :], data[10, :] - data[11, :], data[11, :] - data[12, :], data[12, :] - data[4, :], data[5, :] - data[13, :], data[13, :] - data[14, :], data[14, :] - data[15, :], data[15, :] - data[9, :], data[16, :] - data[17, :], data[17, :] - data[18, :]])) # Convert to bipolar montage: 'Fp1-F7', 'F7-T3', 'T3-T5', 'T5-O1', 'Fp2-F8', 'F8-T4', 'T4-T6', 'T6-O2', 'Fp1-F3','F3-C3', 'C3-P3', 'P3-O1', 'Fp2-F4', 'F4-C4', 'C4-P4', 'P4-O2', 'Fz-Cz', 'Cz-Pz'
+                    EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[0, :] - data[2, :], data[3, :] - data[4, :], data[4, :] - data[5, :], data[3, :] - data[5, :]])) # Convert to bipolar montage: F3-T3, T3-P3, F3-P3, F4-T4, T4-P4, and F4-P4
+                    #EEG_data_list.append(np.array([data[0, :] - data[1, :], data[1, :] - data[2, :], data[2, :] - data[3, :], data[3, :] - data[4, :], data[5, :] - data[6, :], data[6, :] - data[7, :], data[7, :] - data[8, :], data[8, :] - data[9, :], data[0, :] - data[10, :], data[10, :] - data[11, :], data[11, :] - data[12, :], data[12, :] - data[4, :], data[5, :] - data[13, :], data[13, :] - data[14, :], data[14, :] - data[15, :], data[15, :] - data[9, :], data[16, :] - data[17, :], data[17, :] - data[18, :]])) # Convert to bipolar montage: 'Fp1-F7', 'F7-T3', 'T3-T5', 'T5-O1', 'Fp2-F8', 'F8-T4', 'T4-T6', 'T6-O2', 'Fp1-F3','F3-C3', 'C3-P3', 'P3-O1', 'Fp2-F4', 'F4-C4', 'C4-P4', 'P4-O2', 'Fz-Cz', 'Cz-Pz'
 
                     # data size: num_channels * num_samples 
                     #eeg_features = get_eeg_features(data, sampling_frequency).flatten()
@@ -531,7 +535,7 @@ def get_recordings(data_folder, patient_id):
             #num_channels, num_samples = np.shape(data)
             ECG_data = float('nan') * np.ones((5, 6000)) # 5 channels * 100 Hz * 60 s
     else:
-        #ecg_features = float('nan') * np.ones(10) # 5 channels * 2 features / channel
+        #ecg_features = float('na') * np.ones(10) # 5 channels * 2 features / channel
         ECG_data = float('nan') * np.ones((5, 6000)) # 5 channels * 100 Hz * 60 s
 
     # Extract features.
@@ -587,8 +591,8 @@ def data_reshape(model_folder,EEG_recordings, ECG_recordings, outcomes, cpcs, EE
         EEG_x_train = EEG_recordings[j]
         img = list()
         # for m in range(2):
-        # for m in range(6):
-        for m in range(18):
+        for m in range(6):
+        #for m in range(18):
             img = STFT1(EEG_x_train[:,m],1,model_folder,j,m,outcomes[j],cpcs[j],EEG_sampling_frequency,'EEG')
             # dsize = output_width, output_height
             STFT.append(cv2.resize(img, (128, 128), interpolation = cv2.INTER_LINEAR)) # interpolation = cv2.INTER_NEAREST, cv2.INTER_LINEAR, cv2.INTER_CUBIC, cv2.INTER_LANCZOS4
@@ -602,14 +606,14 @@ def data_reshape(model_folder,EEG_recordings, ECG_recordings, outcomes, cpcs, EE
 
         # frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6])))
         # frames.append(np.dstack((STFT[0], STFT[1])))
-        # frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5])))
-        frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6], STFT[7], STFT[8], STFT[9], STFT[10], STFT[11],STFT[12], STFT[13], STFT[14], STFT[15], STFT[16], STFT[17])))
+        frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5])))
+        #frames.append(np.dstack((STFT[0], STFT[1], STFT[2], STFT[3], STFT[4], STFT[5], STFT[6], STFT[7], STFT[8], STFT[9], STFT[10], STFT[11],STFT[12], STFT[13], STFT[14], STFT[15], STFT[16], STFT[17])))
 
     # bring the segment into a better shape
     # X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],7)
     #X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],2)
-    # X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],6)
-    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],18)
+    X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],6)
+    #X_all = np.asarray(frames).reshape(-1, np.shape(STFT[0])[0], np.shape(STFT[0])[1],18)
 
     if outcomes[0] == 'Nan':
         return X_all
