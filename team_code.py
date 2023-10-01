@@ -436,7 +436,7 @@ def get_recordings(data_folder, patient_id):
     # eeg_channels = ['F3', 'P3', 'F4', 'P4']
     eeg_channels = ['F3', 'T3', 'P3', 'F4', 'T4', 'P4']
     #eeg_channels = ['Fp1','F7', 'T3', 'T5', 'O1', 'Fp2','F8', 'T4', 'T6', 'O2', 'F3',
-                'C3', 'P3', 'F4', 'C4', 'P4', 'Fz', 'Cz', 'Pz']
+                #'C3', 'P3', 'F4', 'C4', 'P4', 'Fz', 'Cz', 'Pz']
     
     group = 'EEG'
 
@@ -871,7 +871,7 @@ def plot_figures(A, n_folds,model_history, model_folder):
 #     return features
 
 # # Extract features from the ECG data.
-# def get_ecg_features(data):
+# def get_ecg_features(data): 
 #     num_channels, num_samples = np.shape(data)
 
 #     if num_samples > 0:
