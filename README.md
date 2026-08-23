@@ -327,8 +327,8 @@ The UoM EEE team was listed among the Challenge papers for this work.
 
 ## Authors
 
-**Mengyao Li**
-**Le Xing**
+**Mengyao Li**，
+**Le Xing**，
 **Alexander J. Casson**
 
 Team: **UoM EEE**
