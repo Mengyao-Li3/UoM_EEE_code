@@ -1,6 +1,6 @@
-# UoM EEE — PhysioNet/CinC Challenge 2023
+# UoM_EEE — PhysioNet/CinC Challenge 2023
 
-Research code developed by the **UoM EEE** team for the **George B. Moody PhysioNet Challenge 2023: Predicting Neurological Recovery from Coma After Cardiac Arrest**.
+Research code developed by the **UoM_EEE** team for the **George B. Moody PhysioNet Challenge 2023: Predicting Neurological Recovery from Coma After Cardiac Arrest**.
 
 The repository contains the Python/TensorFlow implementation used to investigate EEG preprocessing, time-frequency representations, convolutional neural networks, and the effect of autoencoder-based artefact removal on downstream neurological outcome prediction.
 
@@ -321,7 +321,7 @@ DOI: https://doi.org/10.22489/CinC.2023.217
 
 The paper describes the development of the six-channel EEG/STFT-based CNN approach and the investigation of autoencoder-based artefact removal for the PhysioNet Challenge 2023.
 
-The UoM EEE team was listed among the Challenge papers for this work.
+The UoM_EEE team was listed among the Challenge papers for this work.
 
 ---
 
@@ -331,7 +331,7 @@ The UoM EEE team was listed among the Challenge papers for this work.
 **Le Xing**，
 **Alexander J. Casson**
 
-Team: **UoM EEE**
+Team: **UoM_EEE**
 
 ---
 
