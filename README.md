@@ -1,6 +1,3 @@
-#Please download the folder 'Autoencoder_Mengyao_Challenge' from https://github.com/Non-Invasive-Bioelectronics-Lab/Modified_Autoencoder4_challenge.git, and then put it under the same directory with team_code.py.
-
-
 # UoM EEE — PhysioNet/CinC Challenge 2023
 
 Research code developed by the **UoM EEE** team for the **George B. Moody PhysioNet Challenge 2023: Predicting Neurological Recovery from Coma After Cardiac Arrest**.
@@ -45,7 +42,8 @@ Filtering / resampling / normalization
       |
       +-----------------------------+
       |                             |
-      |                       Autoencoder
+      v                             v
+Without autoencoder          With autoencoder
       |                       artefact removal
       |                             |
       +-------------+---------------+
@@ -122,7 +120,21 @@ The autoencoder implementation used for these exploratory experiments is availab
 
 https://github.com/Non-Invasive-Bioelectronics-Lab/Modified_Autoencoder4_challenge
 
-The Docker configuration retains this dependency to support reproduction of the exploratory validation experiments.
+To reproduce the exploratory validation experiments involving autoencoder-based artefact removal, download the folder `Autoencoder_Mengyao_Challenge` from the repository above and place it in the same directory as `team_code.py`.
+
+The expected directory structure is:
+
+```text
+.
+├── team_code.py
+├── helper_code.py
+├── Autoencoder_Mengyao_Challenge/
+│   └── ...
+├── train_model.py
+├── run_model.py
+├── requirements.txt
+├── Dockerfile
+└── README.md
 
 ---
 
